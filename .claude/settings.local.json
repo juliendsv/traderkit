@@ -3,7 +3,12 @@
     "allow": [
       "Bash(npx create-next-app@latest . --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --yes)",
       "Bash(npm install:*)",
-      "Bash(npx shadcn@latest init --yes --defaults)"
+      "Bash(npx shadcn@latest init --yes --defaults)",
+      "Bash(npx shadcn@latest add card input label table badge toast --yes)",
+      "Bash(npx shadcn@latest add sonner --yes)",
+      "Bash(npm run:*)",
+      "Bash(npx shadcn@latest add input label --yes)",
+      "Bash(node:*)"
     ]
   }
 }
