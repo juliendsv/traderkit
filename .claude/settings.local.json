@@ -8,7 +8,17 @@
       "Bash(npx shadcn@latest add sonner --yes)",
       "Bash(npm run:*)",
       "Bash(npx shadcn@latest add input label --yes)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "WebFetch(domain:stitch.withgoogle.com)",
+      "WebFetch(domain:support.google.com)",
+      "WebFetch(domain:blog.google)",
+      "WebFetch(domain:developers.google.com)",
+      "WebFetch(domain:labs.google)",
+      "WebFetch(domain:labs.google.com)",
+      "WebFetch(domain:www.adosolve.co.in)",
+      "WebFetch(domain:skills.sh)",
+      "WebFetch(domain:www.codecademy.com)",
+      "WebFetch(domain:www.index.dev)"
     ]
   }
 }
