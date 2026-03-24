@@ -36,9 +36,6 @@ export default function LandingPage() {
         }}
       >
         <div className="max-w-4xl w-full space-y-8">
-          <div className="inline-flex items-center px-4 py-1 rounded-full border border-[#adc6ff]/20 bg-[#adc6ff]/10 text-[#adc6ff] text-sm font-medium tracking-wide">
-            Free during beta
-          </div>
           <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight leading-tight">
             The trading journal<br />built for crypto.
           </h1>
