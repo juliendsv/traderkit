@@ -34,3 +34,11 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Allow list
+
+Set ALLOWED_EMAILS in your .env as a comma-separated list:
+ALLOWED_EMAILS=you@example.com,friend@example.com
+
+Enforcement is server-side in the callback — after Supabase verifies the OTP, the session is immediately killed if the email isn't in the list, and the user is redirected to /auth?error=not_allowed with an inline error message. If
+ALLOWED_EMAILS is unset, all emails are allowed (backwards-compatible).

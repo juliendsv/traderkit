@@ -1,0 +1,29 @@
+import { ReactNode } from 'react'
+
+export default function AuthLayout({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+      />
+      <style>{`
+        .material-symbols-outlined {
+          font-family: 'Material Symbols Outlined';
+          font-weight: normal;
+          font-style: normal;
+          font-size: 24px;
+          line-height: 1;
+          letter-spacing: normal;
+          text-transform: none;
+          display: inline-block;
+          white-space: nowrap;
+          word-wrap: normal;
+          direction: ltr;
+          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+      `}</style>
+      {children}
+    </>
+  )
+}
