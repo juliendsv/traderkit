@@ -20,6 +20,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
           precedence="default"
         />
+        <script defer src="https://analytics.juliendsv.com/script.js" data-website-id="44730054-86f8-4277-9dd2-9a100d38aebd" />
       </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
