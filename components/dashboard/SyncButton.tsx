@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
 
 export function SyncButton({ hasExchange }: { hasExchange: boolean }) {
   const [loading, setLoading] = useState(false)
@@ -24,14 +23,19 @@ export function SyncButton({ hasExchange }: { hasExchange: boolean }) {
   }
 
   return (
-    <Button
+    <button
       onClick={handleSync}
       disabled={loading}
-      variant="outline"
-      size="sm"
-      className="border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800"
+      className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+      style={{
+        border: '1px solid rgba(173,198,255,0.20)',
+        color: '#adc6ff',
+      }}
+      onMouseEnter={(e) => !loading && ((e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(173,198,255,0.05)')}
+      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent')}
     >
-      {loading ? 'Syncing...' : 'Sync now'}
-    </Button>
+      <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>refresh</span>
+      {loading ? 'Syncing…' : 'Sync now'}
+    </button>
   )
 }

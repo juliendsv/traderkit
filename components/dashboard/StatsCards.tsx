@@ -9,66 +9,89 @@ function pct(n: number) {
 }
 
 export function StatsCards({ stats }: { stats: DashboardStats }) {
-  const { totalPnl, winRate, totalTrades, avgWin, avgLoss, totalFees, currentStreak } = stats
+  const { totalPnl, winRate, totalTrades, avgWin, avgLoss, currentStreak } = stats
 
   const cards = [
     {
       label: 'Total P&L',
-      value: fmt(totalPnl),
+      value: (totalPnl >= 0 ? '+' : '') + fmt(totalPnl),
       sub: `${totalTrades} closed trades`,
-      positive: totalPnl >= 0,
-      highlight: true,
+      accentColor: '#4edea3',
+      accentGlow: 'rgba(78,222,163,0.3)',
+      valueColor: '#4edea3',
     },
     {
       label: 'Win Rate',
       value: pct(winRate),
       sub: `${stats.winningTrades}W / ${stats.losingTrades}L`,
-      positive: winRate >= 0.5,
+      accentColor: '#adc6ff',
+      accentGlow: 'rgba(173,198,255,0.3)',
+      valueColor: 'white',
     },
     {
-      label: 'Avg Win',
-      value: fmt(avgWin),
-      sub: 'per winning trade',
-      positive: true,
-    },
-    {
-      label: 'Avg Loss',
-      value: fmt(Math.abs(avgLoss)),
-      sub: 'per losing trade',
-      positive: false,
-    },
-    {
-      label: 'Total Fees',
-      value: fmt(totalFees),
-      sub: 'paid to exchange',
-      positive: null,
+      label: 'Avg Win / Loss',
+      value: null,
+      avgWin: fmt(avgWin),
+      avgLoss: fmt(Math.abs(avgLoss)),
+      sub: null,
+      accentColor: 'rgba(66,71,84,0.20)',
+      accentGlow: null,
+      valueColor: 'white',
     },
     {
       label: 'Current Streak',
-      value: currentStreak.type === 'none'
-        ? '—'
-        : `${currentStreak.count} ${currentStreak.type === 'win' ? 'wins' : 'losses'}`,
-      sub: currentStreak.type === 'none' ? 'No trades yet' : 'in a row',
-      positive: currentStreak.type === 'win' ? true : currentStreak.type === 'loss' ? false : null,
+      value: currentStreak.type === 'none' ? '—' : String(currentStreak.count),
+      valueSuffix: currentStreak.type === 'win' ? ' Wins' : currentStreak.type === 'loss' ? ' Losses' : '',
+      sub: null,
+      accentColor: '#ff5451',
+      accentGlow: 'rgba(255,84,81,0.3)',
+      valueColor: currentStreak.type === 'win' ? '#4edea3' : currentStreak.type === 'loss' ? '#ff5451' : 'white',
     },
   ]
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
       {cards.map((card) => (
         <div
           key={card.label}
-          className={`bg-zinc-900 border rounded-lg p-5 ${card.highlight ? 'border-zinc-700' : 'border-zinc-800'}`}
+          className="rounded-xl p-6 relative overflow-hidden"
+          style={{ backgroundColor: '#1b1f2c' }}
         >
-          <p className="text-zinc-400 text-xs font-medium uppercase tracking-wider mb-1">{card.label}</p>
-          <p className={`text-2xl font-bold tabular-nums ${
-            card.positive === true ? 'text-emerald-400' :
-            card.positive === false ? 'text-red-400' :
-            'text-white'
-          }`}>
-            {card.value}
-          </p>
-          <p className="text-zinc-500 text-xs mt-1">{card.sub}</p>
+          {/* Colored top accent bar */}
+          <div
+            className="absolute top-0 left-0 w-full h-1"
+            style={{
+              backgroundColor: card.accentColor,
+              boxShadow: card.accentGlow ? `0 0 12px ${card.accentGlow}` : undefined,
+            }}
+          />
+          <p className="text-[11px] uppercase tracking-widest mb-2" style={{ color: '#c2c6d6' }}>{card.label}</p>
+
+          {card.avgWin !== undefined ? (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xl" style={{ color: '#4edea3' }}>{card.avgWin}</span>
+                <span className="text-[10px]" style={{ color: '#c2c6d6' }}>Win</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xl" style={{ color: '#ffb4ab' }}>{card.avgLoss}</span>
+                <span className="text-[10px]" style={{ color: '#c2c6d6' }}>Loss</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-4xl font-extrabold tracking-tighter" style={{ color: card.valueColor }}>
+                {card.value}
+              </h3>
+              {card.valueSuffix && (
+                <span className="text-lg font-medium text-white">{card.valueSuffix}</span>
+              )}
+            </div>
+          )}
+
+          {card.sub && (
+            <p className="mt-4 text-[10px] font-medium italic" style={{ color: '#c2c6d6' }}>{card.sub}</p>
+          )}
         </div>
       ))}
     </div>
