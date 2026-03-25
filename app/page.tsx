@@ -1,5 +1,6 @@
 import { CandlestickChart, Check, Zap, BarChart2, CalendarDays, Lock, TrendingUp, RefreshCw } from 'lucide-react'
 import { WaitlistForm } from './_components/WaitlistForm'
+import { ExchangeLogo } from '@/components/KrakenLogo'
 
 export default function LandingPage() {
   return (
@@ -84,16 +85,7 @@ export default function LandingPage() {
           <div className="flex flex-wrap items-center justify-center gap-10">
             {exchanges.map((ex) => (
               <div key={ex.name} className="flex flex-col items-center gap-2">
-                <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`https://www.google.com/s2/favicons?domain=${ex.domain}&sz=64`}
-                    alt={ex.name}
-                    width={40}
-                    height={40}
-                    className="object-contain"
-                  />
-                </div>
+                <ExchangeLogo domain={ex.domain} name={ex.name} size={56} />
                 <span className="text-xs font-bold text-white">{ex.name}</span>
               </div>
             ))}

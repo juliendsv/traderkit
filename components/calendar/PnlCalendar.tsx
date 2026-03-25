@@ -72,7 +72,7 @@ export function PnlCalendar({ dayMap }: Props) {
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-2">
         {WEEKDAYS.map((d) => (
           <div key={d} className="text-center text-xs text-zinc-500 font-medium py-1">{d}</div>
         ))}
@@ -89,7 +89,7 @@ export function PnlCalendar({ dayMap }: Props) {
             <div
               key={dateKey}
               className={cn(
-                'aspect-square rounded-md flex flex-col items-center justify-center p-1 text-xs',
+                'aspect-square min-h-[64px] rounded-md flex flex-col items-center justify-center p-1 text-xs',
                 hasData ? colorForPnl(pnl) : 'bg-zinc-900 text-zinc-600',
                 isToday && 'ring-1 ring-zinc-400'
               )}

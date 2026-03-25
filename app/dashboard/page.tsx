@@ -6,13 +6,13 @@ import { PnlChart } from '@/components/dashboard/PnlChart'
 import { DayOfWeekChart } from '@/components/dashboard/DayOfWeekChart'
 import { BestWorstTokens } from '@/components/dashboard/BestWorstTokens'
 import { SyncButton } from '@/components/dashboard/SyncButton'
+import Link from 'next/link'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth')
 
-  // Fetch last 90 days of trades
   const since = new Date()
   since.setDate(since.getDate() - 90)
 
@@ -23,7 +23,6 @@ export default async function DashboardPage() {
     .gte('opened_at', since.toISOString())
     .order('opened_at', { ascending: true })
 
-  // Fetch connected exchanges
   const { data: exchanges } = await supabase
     .from('exchanges')
     .select('id, exchange_name, is_active, last_synced_at')
@@ -31,27 +30,33 @@ export default async function DashboardPage() {
 
   const stats = computeStats(trades ?? [])
   const hasExchange = (exchanges ?? []).length > 0
+  const lastSynced = exchanges?.find((e) => e.last_synced_at)?.last_synced_at
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="max-w-5xl mx-auto">
+      {/* Page header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
         <div>
-          <h1 className="text-xl font-bold text-white">Overview</h1>
-          <p className="text-zinc-400 text-sm mt-0.5">Last 90 days</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Overview</h1>
+          <p className="text-sm mt-1" style={{ color: '#c2c6d6' }}>Last 90 days performance</p>
         </div>
         <div className="flex items-center gap-3">
           {exchanges && exchanges.length > 0 && (
-            <div className="flex items-center gap-2">
-              {exchanges.map((ex) => (
-                <span key={ex.id} className="text-xs bg-zinc-800 text-zinc-300 px-2 py-1 rounded-full capitalize">
-                  {ex.exchange_name}
-                  {ex.last_synced_at && (
-                    <span className="ml-1 text-zinc-500">
-                      · {new Date(ex.last_synced_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  )}
-                </span>
-              ))}
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-medium tracking-wide"
+              style={{
+                backgroundColor: '#1b1f2c',
+                border: '1px solid rgba(66,71,84,0.10)',
+                color: '#c2c6d6',
+              }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#00a572' }} />
+              <span>
+                {exchanges[0].exchange_name} ·{' '}
+                {lastSynced
+                  ? new Date(lastSynced).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                  : 'never synced'}
+              </span>
             </div>
           )}
           <SyncButton hasExchange={hasExchange} />
@@ -59,17 +64,26 @@ export default async function DashboardPage() {
       </div>
 
       {!hasExchange && (
-        <div className="bg-zinc-900 border border-zinc-700 border-dashed rounded-lg p-8 text-center">
-          <p className="text-zinc-300 font-medium">No exchange connected</p>
-          <p className="text-zinc-500 text-sm mt-1 mb-4">
+        <div
+          className="rounded-xl p-10 text-center mb-8"
+          style={{
+            backgroundColor: '#1b1f2c',
+            border: '1px solid rgba(66,71,84,0.10)',
+          }}
+        >
+          <span className="material-symbols-outlined text-4xl mb-4 block" style={{ color: '#424754' }}>extension</span>
+          <p className="text-white font-semibold mb-1">No exchange connected</p>
+          <p className="text-sm mb-6" style={{ color: '#8c909f' }}>
             Connect your Kraken account to start importing trades automatically.
           </p>
-          <a
+          <Link
             href="/dashboard/connect"
-            className="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-md transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold"
+            style={{ background: 'linear-gradient(135deg, #adc6ff 0%, #4d8eff 100%)', color: '#00285d' }}
           >
-            Connect Kraken →
-          </a>
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>link</span>
+            Connect Kraken
+          </Link>
         </div>
       )}
 
@@ -77,18 +91,24 @@ export default async function DashboardPage() {
         <>
           <StatsCards stats={stats} />
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5">
-            <h2 className="text-sm font-medium text-zinc-300 mb-4">Cumulative P&L</h2>
+          <div
+            className="rounded-xl p-6 mb-8 mt-8"
+            style={{ backgroundColor: '#1b1f2c' }}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h4 className="text-lg font-semibold text-white">Cumulative P&L</h4>
+              <span className="text-xs" style={{ color: '#c2c6d6' }}>Last 90 days</span>
+            </div>
             <PnlChart data={stats.cumulativePnlByDate} />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5">
-              <h2 className="text-sm font-medium text-zinc-300 mb-4">P&L by Day of Week</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="rounded-xl p-6" style={{ backgroundColor: '#1b1f2c' }}>
+              <h4 className="text-lg font-semibold text-white mb-6">P&L by Day of Week</h4>
               <DayOfWeekChart data={stats.pnlByDayOfWeek} />
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5 space-y-4">
-              <h2 className="text-sm font-medium text-zinc-300">Token Performance</h2>
+            <div className="rounded-xl p-6" style={{ backgroundColor: '#1b1f2c' }}>
+              <h4 className="text-lg font-semibold text-white mb-6">Token Performance</h4>
               <BestWorstTokens stats={stats} />
             </div>
           </div>

@@ -1,21 +1,23 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { cn } from '@/lib/utils'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 
-const navItems = [
-  { href: '/dashboard', label: 'Overview', icon: '◈' },
-  { href: '/dashboard/trades', label: 'Trades', icon: '↕' },
-  { href: '/dashboard/calendar', label: 'Calendar', icon: '▦' },
-  { href: '/dashboard/connect', label: 'Connect Exchange', icon: '+' },
+const NAV = [
+  { href: '/dashboard', label: 'Overview', icon: 'dashboard' },
+  { href: '/dashboard/trades', label: 'Trades', icon: 'swap_horiz' },
+  { href: '/dashboard/calendar', label: 'Calendar', icon: 'calendar_today' },
+  { href: '/dashboard/connect', label: 'Connect', icon: 'extension' },
 ]
 
-export function Sidebar() {
+export function Sidebar({ userEmail }: { userEmail: string }) {
   const pathname = usePathname()
   const router = useRouter()
+
+  function isActive(href: string) {
+    return href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
+  }
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -24,46 +26,102 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-56 shrink-0 bg-zinc-950 border-r border-zinc-800 flex flex-col h-screen sticky top-0">
-      <div className="px-5 py-5 border-b border-zinc-800">
-        <Link href="/dashboard" className="text-white font-bold text-lg tracking-tight">
-          TraderKit
-        </Link>
-        <p className="text-zinc-500 text-xs mt-0.5">Trading Journal</p>
-      </div>
+    <>
+      {/* ── Desktop Sidebar ── */}
+      <aside className="hidden lg:flex flex-col h-screen w-64 fixed left-0 top-0 z-50 py-6 px-4" style={{ backgroundColor: '#1b1f2c' }}>
+        {/* Logo */}
+        <div className="flex items-center gap-2 mb-10 px-2">
+          <span className="material-symbols-outlined text-2xl" style={{ color: '#3B82F6', fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" }}>
+            candlestick_chart
+          </span>
+          <span className="text-xl font-bold tracking-tight text-white">TraderKit</span>
+        </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {navItems.map((item) => {
-          const isActive = item.href === '/dashboard'
-            ? pathname === '/dashboard'
-            : pathname.startsWith(item.href)
+        {/* Nav */}
+        <nav className="flex-1 space-y-1">
+          {NAV.map((item) => {
+            const active = isActive(item.href)
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium tracking-tight transition-all duration-200 ${
+                  active
+                    ? 'text-blue-400 bg-blue-500/10 inner-glow-primary border-l-2 border-blue-500'
+                    : 'text-slate-400 hover:bg-[#262a37] border-l-2 border-transparent'
+                }`}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
+        </nav>
+
+        {/* User footer */}
+        <div className="mt-auto pt-6 px-2" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-xs font-medium text-slate-200 truncate max-w-[140px]">{userEmail}</span>
+              <span className="text-[10px] text-slate-500">Pro Tier</span>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="text-slate-500 hover:text-white transition-colors p-1"
+              title="Sign out"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>logout</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* ── Mobile Top Header ── */}
+      <header
+        className="lg:hidden fixed top-0 w-full z-40 flex items-center justify-between px-6 h-16"
+        style={{
+          backgroundColor: 'rgba(10, 14, 26, 0.80)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-2xl" style={{ color: '#3B82F6', fontVariationSettings: "'FILL' 1" }}>
+            candlestick_chart
+          </span>
+          <span className="text-xl font-bold tracking-tight text-white">TraderKit</span>
+        </div>
+        <span className="material-symbols-outlined text-slate-400" style={{ fontSize: '22px' }}>sync</span>
+      </header>
+
+      {/* ── Mobile Bottom Nav ── */}
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-16 px-4 z-50"
+        style={{
+          backgroundColor: 'rgba(15, 19, 31, 0.90)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderTop: '1px solid rgba(255,255,255,0.05)',
+          boxShadow: '0 -8px 24px rgba(0,0,0,0.5)',
+        }}
+      >
+        {NAV.map((item) => {
+          const active = isActive(item.href)
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-                isActive
-                  ? 'bg-zinc-800 text-white font-medium'
-                  : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
-              )}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-xl transition-colors ${
+                active ? 'text-blue-400 bg-blue-500/5' : 'text-slate-500'
+              }`}
             >
-              <span className="text-base leading-none">{item.icon}</span>
-              {item.label}
+              <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>{item.icon}</span>
+              <span className="text-[10px] font-medium">{item.label}</span>
             </Link>
           )
         })}
       </nav>
-
-      <div className="px-3 py-4 border-t border-zinc-800">
-        <button
-          onClick={handleSignOut}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
-        >
-          <span className="text-base leading-none">→</span>
-          Sign out
-        </button>
-      </div>
-    </aside>
+    </>
   )
 }
