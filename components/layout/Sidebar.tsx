@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 const NAV = [
   { href: '/dashboard', label: 'Overview', icon: 'dashboard' },
+  { href: '/dashboard/assets', label: 'Assets', icon: 'pie_chart' },
   { href: '/dashboard/trades', label: 'Trades', icon: 'swap_horiz' },
   { href: '/dashboard/calendar', label: 'Calendar', icon: 'calendar_today' },
   { href: '/dashboard/connect', label: 'Connect', icon: 'extension' },

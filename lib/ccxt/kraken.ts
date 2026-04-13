@@ -25,6 +25,121 @@ export async function validateKrakenKeys(apiKey: string, apiSecret: string): Pro
 }
 
 /**
+ * Returns the current account balances from Kraken.
+ * Maps base currency symbol → total balance (free + on orders).
+ * Only includes assets with a non-zero balance.
+ */
+export async function fetchKrakenBalances(
+  apiKey: string,
+  apiSecret: string
+): Promise<Map<string, number>> {
+  const exchange = new ccxt.kraken({
+    apiKey,
+    secret: apiSecret,
+    enableRateLimit: true,
+    rateLimit: 1000,
+  })
+
+  const raw = await exchange.fetchBalance()
+  const balances = new Map<string, number>()
+
+  // raw.total is a flat { currency: amount } map, already normalized
+  // (e.g. XETH → ETH, XXBT → BTC) by ccxt's commonCurrencies map
+  const totals = (raw.total ?? {}) as unknown as Record<string, number>
+  for (const [currency, amount] of Object.entries(totals)) {
+    if (typeof amount === 'number' && amount > 0) {
+      balances.set(currency, amount)
+    }
+  }
+
+  return balances
+}
+
+const FIAT = new Set(['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF'])
+const STABLECOINS = new Set(['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'USDP', 'GUSD'])
+
+/**
+ * Strips Kraken staking/variant suffixes to get a tradeable base symbol.
+ *   SOL.S   → SOL   (staked Solana)
+ *   SOL03.S → SOL   (Kraken internal staking notation)
+ *   ETH2.S  → ETH   (old staked ETH notation)
+ *   DOT.S   → DOT
+ *   SOL     → SOL   (unchanged)
+ */
+export function krakenBaseSymbol(symbol: string): string {
+  // Remove trailing digits + .S/.M/.F (e.g. ETH2.S → ETH, SOL.S → SOL)
+  return symbol.replace(/\d*\.(S|M|F)$/, '').replace(/\d+$/, '')
+}
+
+/**
+ * Fetches current USD prices for the given symbols using Kraken's public API.
+ * Stablecoins are returned as 1.0. Fiat currencies and unresolvable symbols are omitted.
+ * Kraken staking tokens (e.g. SOL.S) are looked up using their base symbol price.
+ * No API keys required.
+ */
+export async function fetchKrakenPrices(symbols: string[]): Promise<Map<string, number>> {
+  const prices = new Map<string, number>()
+
+  // USD itself and stablecoins don't need a price lookup
+  for (const s of symbols) {
+    if (s === 'USD' || STABLECOINS.has(s)) prices.set(s, 1)
+  }
+
+  // Build a deduplicated set of base symbols to actually fetch
+  // Map: baseSymbol → [original symbols that map to it]
+  const baseToOriginals = new Map<string, string[]>()
+  for (const s of symbols) {
+    if (prices.has(s) || FIAT.has(s)) continue
+    const base = krakenBaseSymbol(s)
+    if (!baseToOriginals.has(base)) baseToOriginals.set(base, [])
+    baseToOriginals.get(base)!.push(s)
+  }
+
+  if (baseToOriginals.size === 0) return prices
+
+  const exchange = new ccxt.kraken({ enableRateLimit: true })
+  const pairs = Array.from(baseToOriginals.keys()).map((b) => `${b}/USD`)
+
+  const fetchedPrices = new Map<string, number>()
+
+  try {
+    const tickers = await exchange.fetchTickers(pairs)
+    for (const [pair, ticker] of Object.entries(tickers)) {
+      const base = pair.split('/')[0]
+      if (typeof ticker.last === 'number' && ticker.last > 0) {
+        fetchedPrices.set(base, ticker.last)
+      }
+    }
+  } catch {
+    // Batch failed — try each individually so one bad pair doesn't block the rest
+    await Promise.allSettled(
+      Array.from(baseToOriginals.keys()).map(async (base) => {
+        try {
+          const ticker = await exchange.fetchTicker(`${base}/USD`)
+          if (typeof ticker.last === 'number' && ticker.last > 0) {
+            fetchedPrices.set(base, ticker.last)
+          }
+        } catch {
+          // Not available vs USD — skip
+        }
+      })
+    )
+  }
+
+  // Map fetched prices back to original symbols (including .S variants)
+  for (const [base, originals] of baseToOriginals.entries()) {
+    const price = fetchedPrices.get(base)
+    if (price !== undefined) {
+      for (const orig of originals) {
+        prices.set(orig, price)
+      }
+    }
+  }
+
+  return prices
+}
+
+/**
  * Fetches all trades from Kraken since a given timestamp.
  * Paginates automatically until no more results are returned.
  */
