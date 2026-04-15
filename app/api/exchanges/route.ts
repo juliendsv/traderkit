@@ -3,8 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 import { encrypt } from '@/lib/crypto'
 import { validateKrakenKeys } from '@/lib/ccxt/kraken'
 import { validateBinanceKeys, type BinanceVariant } from '@/lib/ccxt/binance'
+import { validateCoinbaseKeys } from '@/lib/ccxt/coinbase'
 
-const SUPPORTED_EXCHANGES = new Set(['kraken', 'binance', 'binanceus', 'binanceusdm'])
+const SUPPORTED_EXCHANGES = new Set(['kraken', 'binance', 'binanceus', 'binanceusdm', 'coinbase'])
 const BINANCE_VARIANTS = new Set<string>(['binance', 'binanceus', 'binanceusdm'])
 
 export async function POST(req: NextRequest) {
@@ -32,6 +33,8 @@ export async function POST(req: NextRequest) {
       await validateKrakenKeys(api_key, api_secret)
     } else if (BINANCE_VARIANTS.has(exchange_name)) {
       await validateBinanceKeys(exchange_name as BinanceVariant, api_key, api_secret)
+    } else if (exchange_name === 'coinbase') {
+      await validateCoinbaseKeys(api_key, api_secret)
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'API key validation failed'

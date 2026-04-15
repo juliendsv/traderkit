@@ -15,11 +15,13 @@ TraderKit fills the gap between portfolio trackers (Zerion, CoinStats) and stock
 ## Features
 
 ### Exchange integration
-- Connect **Kraken** or **Binance** (Global, US, or USD-M Futures) with a read-only API key
+- Connect **Kraken**, **Binance** (Global, US, or USD-M Futures), or **Coinbase** with a read-only API key
 - Trades are imported automatically via [ccxt](https://github.com/ccxt/ccxt) and normalized into a unified schema
-- Binance Convert (instant-swap) trades are captured separately and merged into the same trade history
-- Deposits and withdrawals are stored in a separate `transfers` table — never counted as trades
-- Binance Flexible Earn positions (`LD`-prefixed tokens) are excluded from P&L calculations
+- Binance Convert (instant-swap) trades and Coinbase retail (Simple Trade) buys/sells are captured separately and merged into the same trade history
+- Coinbase retail trades are tagged (`_source: coinbase_retail`) to distinguish them from Advanced Trade fills (`coinbase_advanced`)
+- Deposits and withdrawals are stored in a separate `transfers` table — never counted as trades — preserving cost basis across cross-exchange moves
+- Binance Flexible Earn positions (`LD`-prefixed tokens) and Coinbase staking rewards (`staking_reward`, `inflation_reward`, `interest`) are excluded from P&L calculations
+- Coinbase supports both CDP keys (current format: Key Name + multi-line PEM private key) and legacy HMAC keys — CCXT auto-detects the format
 - Auto-sync runs every 4 hours via a Vercel cron job; manual sync available from the dashboard
 - API keys are encrypted at rest with AES-256-GCM before they reach the database
 
@@ -36,8 +38,8 @@ TraderKit fills the gap between portfolio trackers (Zerion, CoinStats) and stock
 ### Asset view
 - Per-asset breakdown: holdings (live from exchange), average cost, current price, realized P&L, win rate, fees paid, portfolio %
 - Live balances fetched in parallel from **all connected exchanges** and merged — one row per token regardless of how many venues hold it
-- Exchange venue label on each row: "Held on: Kraken, Binance"
-- Staking/earn variants normalized to their base symbol: Kraken `SOL.S` → `SOL`, Binance `LDBNB` → `BNB`
+- Exchange venue label on each row: "Held on: Kraken, Binance, Coinbase"
+- Staking/earn variants normalized to their base symbol: Kraken `SOL.S` → `SOL`, Binance `LDBNB` → `BNB` (Coinbase uses clean symbols natively)
 - Exited positions hidden by default; toggle to view full history
 - Click any asset to open its detail page
 
@@ -120,7 +122,8 @@ When unset, all emails are allowed. Enforcement is server-side in the auth callb
 | Phase | Focus |
 |---|---|
 | **Phase 1** | Kraken integration, performance dashboard, calendar, trade list, landing page |
-| **Phase 2 (current)** | Binance (Global / US / USD-M Futures), multi-exchange asset view, Convert trades, transfers |
-| **Phase 3** | Coinbase + Bybit + OKX, per-trade notes/tags, daily journal, CSV import fallback, Stripe payments |
-| **Phase 4** | Solana + EVM wallet import, shareable P&L cards, tax CSV export |
-| **Phase 5** | AI trading insights (Claude), advanced analytics, referral program |
+| **Phase 2** | Binance (Global / US / USD-M Futures), multi-exchange asset view, Convert trades, transfers |
+| **Phase 3 (current)** | Coinbase (Advanced Trade + retail Simple Trade), CDP key support, staking reward filtering |
+| **Phase 4** | Bybit + OKX, per-trade notes/tags, daily journal, CSV import fallback, Stripe payments |
+| **Phase 5** | Solana + EVM wallet import, shareable P&L cards, tax CSV export |
+| **Phase 6** | AI trading insights (Claude), advanced analytics, referral program |

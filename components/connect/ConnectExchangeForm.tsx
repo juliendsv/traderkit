@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation'
 import { KrakenLogo } from '@/components/KrakenLogo'
 import { BinanceLogo } from '@/components/BinanceLogo'
 
-type ExchangeId = 'kraken' | 'binance' | 'binanceus' | 'binanceusdm'
+type ExchangeId = 'kraken' | 'binance' | 'binanceus' | 'binanceusdm' | 'coinbase'
 
 const EXCHANGE_LABELS: Record<ExchangeId, string> = {
   kraken: 'Kraken',
   binance: 'Binance',
   binanceus: 'Binance US',
   binanceusdm: 'Binance Futures',
+  coinbase: 'Coinbase',
 }
 
 type Step = { text: string; emphasis?: string }
@@ -67,6 +68,18 @@ const API_KEY_INSTRUCTIONS: Record<ExchangeId, {
       { text: 'Copy the API Key and Secret Key' },
     ],
   },
+  coinbase: {
+    url: 'https://portal.cdp.coinbase.com/access/api',
+    urlLabel: 'Coinbase Developer Platform',
+    steps: [
+      { text: 'Click ', emphasis: 'Create API Key' },
+      { text: 'Under Permissions, enable only ', emphasis: 'View (read-only)' },
+      { text: 'Do NOT enable Trade, Transfer, or any write permissions' },
+      { text: 'After creation, copy the ', emphasis: 'Key Name' },
+      { text: 'Then click ', emphasis: 'Download private key' },
+      { text: 'Paste the Key Name above and the full private key (including -----BEGIN/END lines) below' },
+    ],
+  },
 }
 
 function ApiKeyInstructions({ exchangeId, accentColor }: { exchangeId: ExchangeId; accentColor: string }) {
@@ -120,7 +133,7 @@ function ApiKeyInstructions({ exchangeId, accentColor }: { exchangeId: ExchangeI
 }
 
 export function ConnectExchangeForm() {
-  const [selected, setSelected] = useState<'kraken' | 'binance_family' | null>(null)
+  const [selected, setSelected] = useState<'kraken' | 'binance_family' | 'coinbase' | null>(null)
   const [binanceVariant, setBinanceVariant] = useState<ExchangeId>('binance')
   const [apiKey, setApiKey] = useState('')
   const [apiSecret, setApiSecret] = useState('')
@@ -129,7 +142,8 @@ export function ConnectExchangeForm() {
   const [connectedAs, setConnectedAs] = useState<ExchangeId | null>(null)
   const router = useRouter()
 
-  const exchangeId: ExchangeId = selected === 'kraken' ? 'kraken' : binanceVariant
+  const exchangeId: ExchangeId =
+    selected === 'kraken' ? 'kraken' : selected === 'coinbase' ? 'coinbase' : binanceVariant
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -183,7 +197,7 @@ export function ConnectExchangeForm() {
         <label className="block text-xs font-bold uppercase tracking-widest mb-4" style={{ color: '#64748b' }}>
           Select Provider
         </label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           {/* Kraken */}
           <button
             type="button"
@@ -210,6 +224,26 @@ export function ConnectExchangeForm() {
           >
             <BinanceLogo size={40} />
             <span className="text-sm font-bold" style={{ color: '#f3ba2f' }}>Binance</span>
+          </button>
+
+          {/* Coinbase */}
+          <button
+            type="button"
+            onClick={() => setSelected('coinbase')}
+            className="rounded-xl p-4 flex flex-col items-center gap-3 transition-all"
+            style={{
+              backgroundColor: selected === 'coinbase' ? 'rgba(0,82,255,0.15)' : 'rgba(0,82,255,0.05)',
+              border: selected === 'coinbase' ? '1px solid rgba(0,82,255,0.55)' : '1px solid rgba(0,82,255,0.20)',
+            }}
+          >
+            {/* Coinbase "C" wordmark placeholder — no external SVG dependency */}
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-black"
+              style={{ backgroundColor: 'rgba(0,82,255,0.15)', color: '#0052FF' }}
+            >
+              C
+            </div>
+            <span className="text-sm font-bold" style={{ color: '#0052FF' }}>Coinbase</span>
           </button>
         </div>
       </div>
@@ -243,7 +277,12 @@ export function ConnectExchangeForm() {
       {selected && (
         <>
           {/* How to get your API key */}
-          <ApiKeyInstructions exchangeId={exchangeId} accentColor={selected === 'kraken' ? '#3b82f6' : '#f3ba2f'} />
+          <ApiKeyInstructions
+            exchangeId={exchangeId}
+            accentColor={
+              selected === 'kraken' ? '#3b82f6' : selected === 'coinbase' ? '#0052FF' : '#f3ba2f'
+            }
+          />
         </>
       )}
 
@@ -274,29 +313,56 @@ export function ConnectExchangeForm() {
             />
           </div>
 
-          {/* API Secret */}
+          {/* API Secret / Private Key */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-widest mb-2 px-1" style={{ color: '#64748b' }} htmlFor="apiSecret">
-              API Secret
+              {exchangeId === 'coinbase' ? 'CDP Private Key' : 'API Secret'}
             </label>
-            <input
-              id="apiSecret"
-              type="password"
-              placeholder="Enter your private secret"
-              value={apiSecret}
-              onChange={(e) => setApiSecret(e.target.value)}
-              required
-              className="w-full rounded-lg px-4 py-3.5 text-sm text-white placeholder-slate-600 outline-none transition-all"
-              style={{ backgroundColor: '#313442', border: '1px solid rgba(66,71,84,0.20)' }}
-              onFocus={(e) => {
-                e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.30)'
-                e.currentTarget.style.borderColor = 'rgba(59,130,246,0.50)'
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.boxShadow = 'none'
-                e.currentTarget.style.borderColor = 'rgba(66,71,84,0.20)'
-              }}
-            />
+            {exchangeId === 'coinbase' ? (
+              <>
+                <textarea
+                  id="apiSecret"
+                  placeholder={'-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----'}
+                  value={apiSecret}
+                  onChange={(e) => setApiSecret(e.target.value)}
+                  required
+                  rows={6}
+                  spellCheck={false}
+                  className="w-full rounded-lg px-4 py-3.5 text-sm text-white placeholder-slate-600 outline-none transition-all font-mono resize-none"
+                  style={{ backgroundColor: '#313442', border: '1px solid rgba(66,71,84,0.20)' }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.boxShadow = '0 0 0 2px rgba(0,82,255,0.30)'
+                    e.currentTarget.style.borderColor = 'rgba(0,82,255,0.50)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.boxShadow = 'none'
+                    e.currentTarget.style.borderColor = 'rgba(66,71,84,0.20)'
+                  }}
+                />
+                <p className="text-[11px] mt-1.5 px-1" style={{ color: '#64748b' }}>
+                  Paste the full private key including the -----BEGIN and -----END lines.
+                </p>
+              </>
+            ) : (
+              <input
+                id="apiSecret"
+                type="password"
+                placeholder="Enter your private secret"
+                value={apiSecret}
+                onChange={(e) => setApiSecret(e.target.value)}
+                required
+                className="w-full rounded-lg px-4 py-3.5 text-sm text-white placeholder-slate-600 outline-none transition-all"
+                style={{ backgroundColor: '#313442', border: '1px solid rgba(66,71,84,0.20)' }}
+                onFocus={(e) => {
+                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.30)'
+                  e.currentTarget.style.borderColor = 'rgba(59,130,246,0.50)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.boxShadow = 'none'
+                  e.currentTarget.style.borderColor = 'rgba(66,71,84,0.20)'
+                }}
+              />
+            )}
           </div>
 
           {error && (
@@ -313,10 +379,13 @@ export function ConnectExchangeForm() {
             disabled={loading || !apiKey || !apiSecret}
             className="w-full py-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
             style={{
-              background: selected === 'kraken'
-                ? 'linear-gradient(135deg, #adc6ff 0%, #4d8eff 100%)'
-                : 'linear-gradient(135deg, #ffe066 0%, #f3ba2f 100%)',
-              color: '#001a42',
+              background:
+                selected === 'kraken'
+                  ? 'linear-gradient(135deg, #adc6ff 0%, #4d8eff 100%)'
+                  : selected === 'coinbase'
+                  ? 'linear-gradient(135deg, #5b8fff 0%, #0052FF 100%)'
+                  : 'linear-gradient(135deg, #ffe066 0%, #f3ba2f 100%)',
+              color: selected === 'coinbase' ? '#fff' : '#001a42',
             }}
           >
             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>link</span>

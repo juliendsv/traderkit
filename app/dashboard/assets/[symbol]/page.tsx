@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { computeAssetStats } from '@/lib/pnl/assets'
 import { fetchKrakenBalances, fetchKrakenPrices, krakenBaseSymbol } from '@/lib/ccxt/kraken'
 import { fetchBinanceBalances, binanceBaseSymbol, type BinanceVariant } from '@/lib/ccxt/binance'
+import { fetchCoinbaseBalances } from '@/lib/ccxt/coinbase'
 import { decrypt } from '@/lib/crypto'
 import { TradesTable, TradeTableRow } from '@/components/trades/TradesTable'
 import { TradeSimulator } from '@/components/assets/TradeSimulator'
@@ -15,6 +16,7 @@ const EXCHANGE_DISPLAY: Record<string, string> = {
   binance: 'Binance',
   binanceus: 'Binance US',
   binanceusdm: 'Binance Futures',
+  coinbase: 'Coinbase',
 }
 
 function fmt(n: number, decimals = 2) {
@@ -92,6 +94,8 @@ export default async function AssetDetailPage({
           rawBalances = await fetchKrakenBalances(apiKey, apiSecret)
         } else if (BINANCE_VARIANTS.has(ex.exchange_name)) {
           rawBalances = await fetchBinanceBalances(ex.exchange_name as BinanceVariant, apiKey, apiSecret)
+        } else if (ex.exchange_name === 'coinbase') {
+          rawBalances = await fetchCoinbaseBalances(apiKey, apiSecret)
         } else {
           return { exchangeName: ex.exchange_name, balance: 0 }
         }

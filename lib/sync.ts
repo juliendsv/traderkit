@@ -6,11 +6,17 @@ import {
   fetchBinanceTransfers,
   type BinanceVariant,
 } from './ccxt/binance'
+import {
+  fetchCoinbaseTrades,
+  fetchCoinbaseRetailTrades,
+  fetchCoinbaseTransfers,
+} from './ccxt/coinbase'
 import { computePnlFifo, TradeForPnl } from './pnl/fifo'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database, Json } from './supabase/types'
 
 const BINANCE_VARIANTS = new Set<string>(['binance', 'binanceus', 'binanceusdm'])
+const COINBASE_EXCHANGES = new Set<string>(['coinbase'])
 
 type SyncResult = {
   exchange_id: string
@@ -21,7 +27,7 @@ type SyncResult = {
 }
 
 /**
- * Syncs trades (and transfers for Binance) for a single exchange row.
+ * Syncs trades (and transfers for Binance/Coinbase) for a single exchange row.
  * Fetches new trades via ccxt, computes FIFO P&L, and upserts into the trades table.
  */
 export async function syncExchange(
@@ -64,11 +70,26 @@ export async function syncExchange(
           return true
         })
         .sort((a, b) => a.opened_at.getTime() - b.opened_at.getTime())
+    } else if (COINBASE_EXCHANGES.has(exchange_name)) {
+      const [advancedTrades, retailTrades] = await Promise.all([
+        fetchCoinbaseTrades(apiKey, apiSecret, since),
+        fetchCoinbaseRetailTrades(apiKey, apiSecret, since),
+      ])
+      // Merge advanced + retail, deduplicate by external_id, sort ascending
+      // IDs never collide: retail_ prefix on retail entries ensures uniqueness
+      const seen = new Set<string>()
+      newTrades = [...advancedTrades, ...retailTrades]
+        .filter((t) => {
+          if (seen.has(t.external_id)) return false
+          seen.add(t.external_id)
+          return true
+        })
+        .sort((a, b) => a.opened_at.getTime() - b.opened_at.getTime())
     } else {
       throw new Error(`Unsupported exchange: ${exchange_name}`)
     }
 
-    // ── Sync transfers for Binance (fire-and-forget alongside trade sync) ────
+    // ── Sync transfers for Binance/Coinbase ──────────────────────────────────
     let transfers_imported = 0
     if (BINANCE_VARIANTS.has(exchange_name)) {
       transfers_imported = await syncBinanceTransfers(
@@ -76,6 +97,15 @@ export async function syncExchange(
         exchange_id,
         user_id,
         exchange_name as BinanceVariant,
+        apiKey,
+        apiSecret,
+        since
+      )
+    } else if (COINBASE_EXCHANGES.has(exchange_name)) {
+      transfers_imported = await syncCoinbaseTransfers(
+        supabase,
+        exchange_id,
+        user_id,
         apiKey,
         apiSecret,
         since
@@ -189,6 +219,54 @@ async function syncBinanceTransfers(
     if (transfers.length === 0) return 0
 
     // Fetch existing transfer IDs so we can deduplicate
+    const { data: existing } = await supabase
+      .from('transfers')
+      .select('external_id')
+      .eq('exchange_id', exchange_id)
+
+    const existingSet = new Set((existing ?? []).map((t) => t.external_id))
+    const newTransfers = transfers.filter((t) => !existingSet.has(t.external_id))
+
+    if (newTransfers.length === 0) return 0
+
+    const rows = newTransfers.map((t) => ({
+      user_id,
+      exchange_id,
+      external_id: t.external_id,
+      currency: t.currency,
+      amount: t.amount,
+      type: t.type,
+      status: t.status,
+      tx_hash: t.tx_hash,
+      address: t.address,
+      occurred_at: t.occurred_at.toISOString(),
+      raw_data: t.raw_data as Json,
+    }))
+
+    await supabase.from('transfers').upsert(rows, { onConflict: 'exchange_id,external_id' })
+    return newTransfers.length
+  } catch {
+    // Transfer sync failure should not fail the whole trade sync
+    return 0
+  }
+}
+
+/**
+ * Fetches and upserts Coinbase deposits/withdrawals into the transfers table.
+ * Returns the number of new transfers imported.
+ */
+async function syncCoinbaseTransfers(
+  supabase: SupabaseClient<Database>,
+  exchange_id: string,
+  user_id: string,
+  apiKey: string,
+  apiSecret: string,
+  since?: number
+): Promise<number> {
+  try {
+    const transfers = await fetchCoinbaseTransfers(apiKey, apiSecret, since)
+    if (transfers.length === 0) return 0
+
     const { data: existing } = await supabase
       .from('transfers')
       .select('external_id')
