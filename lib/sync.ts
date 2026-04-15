@@ -1,18 +1,27 @@
 import { decrypt } from './crypto'
 import { fetchKrakenTrades } from './ccxt/kraken'
+import {
+  fetchBinanceTrades,
+  fetchBinanceConvertTrades,
+  fetchBinanceTransfers,
+  type BinanceVariant,
+} from './ccxt/binance'
 import { computePnlFifo, TradeForPnl } from './pnl/fifo'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database, Json } from './supabase/types'
+
+const BINANCE_VARIANTS = new Set<string>(['binance', 'binanceus', 'binanceusdm'])
 
 type SyncResult = {
   exchange_id: string
   exchange_name: string
   trades_imported: number
+  transfers_imported?: number
   error?: string
 }
 
 /**
- * Syncs trades for a single exchange row.
+ * Syncs trades (and transfers for Binance) for a single exchange row.
  * Fetches new trades via ccxt, computes FIFO P&L, and upserts into the trades table.
  */
 export async function syncExchange(
@@ -36,25 +45,52 @@ export async function syncExchange(
       ? new Date(exchange.last_synced_at).getTime()
       : undefined
 
-    // Fetch new trades from the exchange
+    // ── Fetch new trades ─────────────────────────────────────────────────────
     let newTrades
     if (exchange_name === 'kraken') {
       newTrades = await fetchKrakenTrades(apiKey, apiSecret, since)
+    } else if (BINANCE_VARIANTS.has(exchange_name)) {
+      const variant = exchange_name as BinanceVariant
+      const [spotTrades, convertTrades] = await Promise.all([
+        fetchBinanceTrades(variant, apiKey, apiSecret, since),
+        fetchBinanceConvertTrades(variant, apiKey, apiSecret, since),
+      ])
+      // Merge spot + convert, deduplicate by external_id, sort ascending
+      const seen = new Set<string>()
+      newTrades = [...spotTrades, ...convertTrades]
+        .filter((t) => {
+          if (seen.has(t.external_id)) return false
+          seen.add(t.external_id)
+          return true
+        })
+        .sort((a, b) => a.opened_at.getTime() - b.opened_at.getTime())
     } else {
       throw new Error(`Unsupported exchange: ${exchange_name}`)
+    }
+
+    // ── Sync transfers for Binance (fire-and-forget alongside trade sync) ────
+    let transfers_imported = 0
+    if (BINANCE_VARIANTS.has(exchange_name)) {
+      transfers_imported = await syncBinanceTransfers(
+        supabase,
+        exchange_id,
+        user_id,
+        exchange_name as BinanceVariant,
+        apiKey,
+        apiSecret,
+        since
+      )
     }
 
     if (newTrades.length === 0) {
       await supabase.from('exchanges').update({ last_synced_at: new Date().toISOString() }).eq('id', exchange_id)
       await supabase.from('sync_logs').insert({ exchange_id, status: 'success', trades_imported: 0 })
-      return { exchange_id, exchange_name, trades_imported: 0 }
+      return { exchange_id, exchange_name, trades_imported: 0, transfers_imported }
     }
 
-    // For correct FIFO P&L on new sells, we need existing buy positions.
-    // Re-run FIFO on all trades for affected currencies.
+    // ── FIFO P&L: re-run over affected currencies ────────────────────────────
     const newCurrencies = [...new Set(newTrades.map((t) => t.base_currency))]
 
-    // Fetch existing trades for these currencies (sorted asc by opened_at)
     const { data: existingTrades } = await supabase
       .from('trades')
       .select('id, external_id, pair, base_currency, quote_currency, side, amount, price, fee, opened_at')
@@ -62,7 +98,6 @@ export async function syncExchange(
       .in('base_currency', newCurrencies)
       .order('opened_at', { ascending: true })
 
-    // Merge existing + new trades, deduplicate by external_id, sort asc
     const existingSet = new Set((existingTrades ?? []).map((t) => t.external_id))
     const dedupedNew = newTrades.filter((t) => !existingSet.has(t.external_id))
 
@@ -91,10 +126,8 @@ export async function syncExchange(
       })),
     ].sort((a, b) => a.opened_at.getTime() - b.opened_at.getTime())
 
-    // Compute FIFO P&L for all trades
     const withPnl = computePnlFifo(allForCurrency)
 
-    // Upsert only the new trades (with their computed P&L)
     const newExternalIds = new Set(dedupedNew.map((t) => t.external_id))
     const toUpsert = withPnl.filter((t) => newExternalIds.has(t.external_id))
 
@@ -127,14 +160,63 @@ export async function syncExchange(
       if (upsertError) throw upsertError
     }
 
-    // Update last_synced_at and log success
     await supabase.from('exchanges').update({ last_synced_at: new Date().toISOString() }).eq('id', exchange_id)
     await supabase.from('sync_logs').insert({ exchange_id, status: 'success', trades_imported: toUpsert.length })
 
-    return { exchange_id, exchange_name, trades_imported: toUpsert.length }
+    return { exchange_id, exchange_name, trades_imported: toUpsert.length, transfers_imported }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     try { await supabase.from('sync_logs').insert({ exchange_id, status: 'error', error: message }) } catch { /* ignore */ }
     return { exchange_id, exchange_name, trades_imported: 0, error: message }
+  }
+}
+
+/**
+ * Fetches and upserts Binance deposits/withdrawals into the transfers table.
+ * Returns the number of new transfers imported.
+ */
+async function syncBinanceTransfers(
+  supabase: SupabaseClient<Database>,
+  exchange_id: string,
+  user_id: string,
+  variant: BinanceVariant,
+  apiKey: string,
+  apiSecret: string,
+  since?: number
+): Promise<number> {
+  try {
+    const transfers = await fetchBinanceTransfers(variant, apiKey, apiSecret, since)
+    if (transfers.length === 0) return 0
+
+    // Fetch existing transfer IDs so we can deduplicate
+    const { data: existing } = await supabase
+      .from('transfers')
+      .select('external_id')
+      .eq('exchange_id', exchange_id)
+
+    const existingSet = new Set((existing ?? []).map((t) => t.external_id))
+    const newTransfers = transfers.filter((t) => !existingSet.has(t.external_id))
+
+    if (newTransfers.length === 0) return 0
+
+    const rows = newTransfers.map((t) => ({
+      user_id,
+      exchange_id,
+      external_id: t.external_id,
+      currency: t.currency,
+      amount: t.amount,
+      type: t.type,
+      status: t.status,
+      tx_hash: t.tx_hash,
+      address: t.address,
+      occurred_at: t.occurred_at.toISOString(),
+      raw_data: t.raw_data as Json,
+    }))
+
+    await supabase.from('transfers').upsert(rows, { onConflict: 'exchange_id,external_id' })
+    return newTransfers.length
+  } catch {
+    // Transfer sync failure should not fail the whole trade sync
+    return 0
   }
 }

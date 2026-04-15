@@ -8,17 +8,20 @@
 
 ## What it is
 
-TraderKit fills the gap between portfolio trackers (Zerion, CoinStats) and stock-oriented trading journals (TraderSync, TradeZella). Neither category works well for an active crypto trader who uses a CEX like Kraken alongside some on-chain trading. TraderKit is crypto-native from day one: direct API integration, automatic sync, and metrics that actually matter to traders.
+TraderKit fills the gap between portfolio trackers (Zerion, CoinStats) and stock-oriented trading journals (TraderSync, TradeZella). Neither category works well for an active crypto trader who uses a CEX like Kraken or Binance alongside some on-chain trading. TraderKit is crypto-native from day one: direct API integration, automatic sync, and metrics that actually matter to traders.
 
 ---
 
 ## Features
 
 ### Exchange integration
-- Connect your Kraken account with a read-only API key
-- Trades are imported automatically via [ccxt](https://github.com/ccxt/ccxt) and normalized into a unified format
+- Connect **Kraken** or **Binance** (Global, US, or USD-M Futures) with a read-only API key
+- Trades are imported automatically via [ccxt](https://github.com/ccxt/ccxt) and normalized into a unified schema
+- Binance Convert (instant-swap) trades are captured separately and merged into the same trade history
+- Deposits and withdrawals are stored in a separate `transfers` table — never counted as trades
+- Binance Flexible Earn positions (`LD`-prefixed tokens) are excluded from P&L calculations
 - Auto-sync runs every 4 hours via a Vercel cron job; manual sync available from the dashboard
-- API keys are encrypted at rest in Supabase
+- API keys are encrypted at rest with AES-256-GCM before they reach the database
 
 ### Performance dashboard
 - **Total P&L** — realized profit/loss across all closed trades (last 90 days)
@@ -32,14 +35,16 @@ TraderKit fills the gap between portfolio trackers (Zerion, CoinStats) and stock
 
 ### Asset view
 - Per-asset breakdown: holdings (live from exchange), average cost, current price, realized P&L, win rate, fees paid, portfolio %
-- Live balances fetched directly from the exchange — reflects deposits, not just imported trades
-- Kraken staking variants (e.g. `SOL.S`, `ETH2.S`) are merged under their base symbol
+- Live balances fetched in parallel from **all connected exchanges** and merged — one row per token regardless of how many venues hold it
+- Exchange venue label on each row: "Held on: Kraken, Binance"
+- Staking/earn variants normalized to their base symbol: Kraken `SOL.S` → `SOL`, Binance `LDBNB` → `BNB`
 - Exited positions hidden by default; toggle to view full history
 - Click any asset to open its detail page
 
 ### Asset detail page
-- All historical trades for a single asset in one view
+- All historical trades for a single asset in one view, across all exchanges
 - Stats strip: holdings, average cost, current price, realized P&L, win rate
+- Per-exchange holdings breakdown panel when the token is held on more than one exchange
 - **Trade simulator**: model a hypothetical buy or sell and instantly see the outcome
   - Buy mode: enter amount + price to see the projected new average cost and break-even price
   - Sell mode: enter amount + price to see trade P&L, total P&L, new average cost, and updated break-even
@@ -114,7 +119,8 @@ When unset, all emails are allowed. Enforcement is server-side in the auth callb
 
 | Phase | Focus |
 |---|---|
-| **Phase 1 (current)** | Kraken integration, performance dashboard, calendar, trade list, landing page |
-| **Phase 2** | Binance + Coinbase + Bybit + OKX, per-trade notes/tags, daily journal, CSV import fallback, Stripe payments |
-| **Phase 3** | Solana + EVM wallet import, shareable P&L cards, tax CSV export |
-| **Phase 4** | AI trading insights (Claude), advanced analytics, referral program |
+| **Phase 1** | Kraken integration, performance dashboard, calendar, trade list, landing page |
+| **Phase 2 (current)** | Binance (Global / US / USD-M Futures), multi-exchange asset view, Convert trades, transfers |
+| **Phase 3** | Coinbase + Bybit + OKX, per-trade notes/tags, daily journal, CSV import fallback, Stripe payments |
+| **Phase 4** | Solana + EVM wallet import, shareable P&L cards, tax CSV export |
+| **Phase 5** | AI trading insights (Claude), advanced analytics, referral program |

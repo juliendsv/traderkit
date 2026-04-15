@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { encrypt } from '@/lib/crypto'
 import { validateKrakenKeys } from '@/lib/ccxt/kraken'
+import { validateBinanceKeys, type BinanceVariant } from '@/lib/ccxt/binance'
+
+const SUPPORTED_EXCHANGES = new Set(['kraken', 'binance', 'binanceus', 'binanceusdm'])
+const BINANCE_VARIANTS = new Set<string>(['binance', 'binanceus', 'binanceusdm'])
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -18,13 +22,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'exchange_name, api_key, and api_secret are required' }, { status: 400 })
   }
 
-  if (exchange_name !== 'kraken') {
-    return NextResponse.json({ error: 'Only Kraken is supported in Phase 1' }, { status: 400 })
+  if (!SUPPORTED_EXCHANGES.has(exchange_name)) {
+    return NextResponse.json({ error: `Unsupported exchange: ${exchange_name}` }, { status: 400 })
   }
 
   // Validate keys by making a test API call
   try {
-    await validateKrakenKeys(api_key, api_secret)
+    if (exchange_name === 'kraken') {
+      await validateKrakenKeys(api_key, api_secret)
+    } else if (BINANCE_VARIANTS.has(exchange_name)) {
+      await validateBinanceKeys(exchange_name as BinanceVariant, api_key, api_secret)
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'API key validation failed'
     return NextResponse.json({ error: `Invalid API keys: ${message}` }, { status: 400 })

@@ -3,7 +3,10 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { computeAssetStats, AssetStats } from '@/lib/pnl/assets'
 import { fetchKrakenBalances, fetchKrakenPrices, krakenBaseSymbol } from '@/lib/ccxt/kraken'
+import { fetchBinanceBalances, binanceBaseSymbol, type BinanceVariant } from '@/lib/ccxt/binance'
 import { decrypt } from '@/lib/crypto'
+
+const BINANCE_VARIANTS = new Set<string>(['binance', 'binanceus', 'binanceusdm'])
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -34,6 +37,22 @@ function emptyStats(symbol: string): AssetStats {
     winRate: 0,
     totalFees: 0,
   }
+}
+
+/** Normalize a raw balance symbol to its tradeable base symbol, regardless of exchange. */
+function normalizeSymbol(symbol: string): string {
+  // Kraken staking: SOL.S → SOL, ETH2.S → ETH
+  const krNorm = krakenBaseSymbol(symbol)
+  if (krNorm !== symbol) return krNorm
+  // Binance earn: LDBNB → BNB
+  return binanceBaseSymbol(symbol)
+}
+
+const EXCHANGE_DISPLAY: Record<string, string> = {
+  kraken: 'Kraken',
+  binance: 'Binance',
+  binanceus: 'Binance US',
+  binanceusdm: 'Binance Futures',
 }
 
 // ─── sub-components ─────────────────────────────────────────────────────────
@@ -81,12 +100,14 @@ const COLS = '1.4fr 1fr 1fr 1fr 1fr 1fr 0.9fr 0.8fr'
 function AssetRow({
   asset,
   liveBalance,
+  venues,
   portfolioPct,
   currentPrice,
   priceFetchedAt,
 }: {
   asset: AssetStats
   liveBalance: number | null
+  venues: string[]
   portfolioPct: number | null
   currentPrice: number | null
   priceFetchedAt: string | null
@@ -116,7 +137,9 @@ function AssetRow({
         <div>
           <p className="text-white font-semibold text-sm">{asset.symbol}</p>
           <p className="text-[11px]" style={{ color: '#8c909f' }}>
-            {hasTradeHistory
+            {venues.length > 0
+              ? `Held on: ${venues.join(', ')}`
+              : hasTradeHistory
               ? `${asset.totalTrades} trade${asset.totalTrades !== 1 ? 's' : ''}`
               : 'deposit only'}
           </p>
@@ -237,7 +260,7 @@ export default async function AssetsPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth')
 
-  const [{ data: trades }, { data: exchange }] = await Promise.all([
+  const [{ data: trades }, { data: allExchanges }] = await Promise.all([
     supabase
       .from('trades')
       .select('id, pair, base_currency, quote_currency, side, amount, price, fee, pnl, opened_at')
@@ -246,55 +269,68 @@ export default async function AssetsPage({
     supabase
       .from('exchanges')
       .select('id, exchange_name, api_key_encrypted, api_secret_encrypted')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle(),
+      .eq('user_id', user.id),
   ])
 
-  const hasExchange = exchange !== null
+  const hasExchange = (allExchanges?.length ?? 0) > 0
 
-  // Fetch live balances from Kraken
-  let liveBalances: Map<string, number> | null = null
-  let balanceError: string | null = null
-  if (exchange?.exchange_name === 'kraken') {
-    try {
-      const apiKey = decrypt(exchange.api_key_encrypted)
-      const apiSecret = decrypt(exchange.api_secret_encrypted)
-      liveBalances = await fetchKrakenBalances(apiKey, apiSecret)
-    } catch (err) {
-      balanceError = err instanceof Error ? err.message : 'Unknown error'
-      console.error('[assets] fetchKrakenBalances failed:', balanceError)
-    }
+  // Fetch live balances from all connected exchanges in parallel
+  // Result: Map<base_symbol, { total: number; venues: string[] }>
+  const mergedBalances = new Map<string, { total: number; venues: Set<string> }>()
+  let anyBalanceError = false
+
+  if (allExchanges && allExchanges.length > 0) {
+    const balanceResults = await Promise.allSettled(
+      allExchanges.map(async (ex) => {
+        const apiKey = decrypt(ex.api_key_encrypted)
+        const apiSecret = decrypt(ex.api_secret_encrypted)
+        let rawBalances: Map<string, number>
+
+        if (ex.exchange_name === 'kraken') {
+          rawBalances = await fetchKrakenBalances(apiKey, apiSecret)
+        } else if (BINANCE_VARIANTS.has(ex.exchange_name)) {
+          rawBalances = await fetchBinanceBalances(ex.exchange_name as BinanceVariant, apiKey, apiSecret)
+        } else {
+          return
+        }
+
+        const displayName = EXCHANGE_DISPLAY[ex.exchange_name] ?? ex.exchange_name
+        for (const [currency, amount] of rawBalances.entries()) {
+          if (amount <= 1e-8) continue
+          const base = normalizeSymbol(currency)
+          if (!mergedBalances.has(base)) {
+            mergedBalances.set(base, { total: 0, venues: new Set() })
+          }
+          const entry = mergedBalances.get(base)!
+          entry.total += amount
+          entry.venues.add(displayName)
+        }
+      })
+    )
+
+    anyBalanceError = balanceResults.some((r) => r.status === 'rejected')
   }
 
   // Build stats from trade history
   const tradeStats = computeAssetStats(trades ?? [])
-  // Index trade stats by both their exact symbol AND their base symbol
   const tradeStatsMap = new Map(tradeStats.map((a) => [a.symbol, a]))
 
   // Collect every raw symbol from trade history and live balance
   const SKIP = new Set(['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'KFEE'])
-  const rawSymbols = new Set([
+  const baseSymbols = new Set<string>([
     ...tradeStats.map((a) => a.symbol),
-    ...(liveBalances ? liveBalances.keys() : []),
+    ...mergedBalances.keys(),
   ])
 
-  // Group raw symbols by their base symbol (merges SOL + SOL03.S → SOL)
-  const groups = new Map<string, string[]>() // base → [raw symbols]
-  for (const s of rawSymbols) {
-    if (SKIP.has(s)) continue
-    const base = krakenBaseSymbol(s)
-    if (!groups.has(base)) groups.set(base, [])
-    groups.get(base)!.push(s)
-  }
+  // Remove skipped symbols
+  for (const s of SKIP) baseSymbols.delete(s)
 
-  const baseSymbols = Array.from(groups.keys())
+  const baseSymbolList = Array.from(baseSymbols)
 
-  // Fetch current prices for base symbols that have any holding
-  const basesWithHolding = baseSymbols.filter((base) => {
-    const variants = groups.get(base)!
-    return variants.some((s) => (liveBalances?.get(s) ?? 0) > 1e-8)
-  })
+  // Fetch current prices for symbols with any live holding
+  const basesWithHolding = baseSymbolList.filter(
+    (base) => (mergedBalances.get(base)?.total ?? 0) > 1e-8
+  )
 
   let prices: Map<string, number> = new Map()
   let priceFetchedAt: string | null = null
@@ -313,14 +349,11 @@ export default async function AssetsPage({
     }
   }
 
-  // Compute portfolio values using merged balances
+  // Compute portfolio values
   const portfolioValues = new Map<string, number>()
   let totalPortfolioValue = 0
-  for (const base of baseSymbols) {
-    const totalBalance = (groups.get(base) ?? []).reduce(
-      (sum, s) => sum + (liveBalances?.get(s) ?? 0),
-      0
-    )
+  for (const base of baseSymbolList) {
+    const totalBalance = mergedBalances.get(base)?.total ?? 0
     const price = prices.get(base) ?? null
     if (totalBalance > 1e-8 && price !== null) {
       const value = totalBalance * price
@@ -330,22 +363,17 @@ export default async function AssetsPage({
   }
 
   // Build one display row per base symbol
-  const rows = baseSymbols
+  const rows = baseSymbolList
     .map((base) => {
-      const variants = groups.get(base)!
-      // Sum live balances across all variants (SOL + SOL03.S)
-      const totalLiveBalance = liveBalances
-        ? variants.reduce((sum, s) => sum + (liveBalances.get(s) ?? 0), 0)
-        : null
-      // Use trade stats from the canonical (non-staking) variant if available
-      const asset =
-        tradeStatsMap.get(base) ??
-        variants.map((s) => tradeStatsMap.get(s)).find(Boolean) ??
-        emptyStats(base)
+      const balEntry = mergedBalances.get(base)
+      const totalLiveBalance = balEntry ? balEntry.total : null
+      const venues = balEntry ? Array.from(balEntry.venues) : []
+      const asset = tradeStatsMap.get(base) ?? emptyStats(base)
       return {
         symbol: base,
         asset,
         liveBalance: totalLiveBalance !== null && totalLiveBalance > 1e-8 ? totalLiveBalance : null,
+        venues,
         portfolioPct:
           totalPortfolioValue > 0 && portfolioValues.has(base)
             ? (portfolioValues.get(base)! / totalPortfolioValue) * 100
@@ -373,11 +401,10 @@ export default async function AssetsPage({
           <p className="text-sm mt-1" style={{ color: '#c2c6d6' }}>
             Holdings, cost basis &amp; performance · All-time
           </p>
-          {liveBalances === null && hasExchange && (
+          {anyBalanceError && hasExchange && (
             <p className="text-xs mt-2 flex items-center gap-1.5" style={{ color: '#f87171' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>warning</span>
-              Live balance unavailable — showing estimated holdings from trades.
-              {balanceError && <span style={{ color: '#6b7280' }}> ({balanceError})</span>}
+              Some live balances unavailable — showing estimated holdings from trades.
             </p>
           )}
         </div>
@@ -404,7 +431,7 @@ export default async function AssetsPage({
         >
           <span className="material-symbols-outlined text-4xl mb-4 block" style={{ color: '#424754' }}>extension</span>
           <p className="text-white font-semibold mb-1">No exchange connected</p>
-          <p className="text-sm" style={{ color: '#8c909f' }}>Connect your Kraken account to start tracking your assets.</p>
+          <p className="text-sm" style={{ color: '#8c909f' }}>Connect Kraken or Binance to start tracking your assets.</p>
         </div>
       )}
 
@@ -421,7 +448,6 @@ export default async function AssetsPage({
 
       {hasExchange && visibleRows.length > 0 && (
         <>
-          {/* Column headers */}
           <div className="grid px-5 mb-2" style={{ gridTemplateColumns: COLS }}>
             {['Asset', 'Holdings', 'Avg Cost', 'Current Price', 'Realized P&L', 'Win Rate', 'Fees Paid', 'Portfolio'].map((h) => (
               <p key={h} className="text-[11px] font-medium uppercase tracking-wider" style={{ color: '#424754' }}>
@@ -431,11 +457,12 @@ export default async function AssetsPage({
           </div>
 
           <div className="flex flex-col gap-2">
-            {visibleRows.map(({ symbol, asset, liveBalance, portfolioPct }) => (
+            {visibleRows.map(({ symbol, asset, liveBalance, venues, portfolioPct }) => (
               <Link key={symbol} href={`/dashboard/assets/${encodeURIComponent(symbol)}`} className="block group">
                 <AssetRow
                   asset={asset}
                   liveBalance={liveBalance}
+                  venues={venues}
                   portfolioPct={portfolioPct}
                   currentPrice={prices.get(symbol) ?? null}
                   priceFetchedAt={priceFetchedAt}
@@ -444,7 +471,6 @@ export default async function AssetsPage({
             ))}
           </div>
 
-          {/* Footer */}
           <div
             className="mt-6 rounded-xl px-5 py-4 flex items-center justify-between"
             style={{ backgroundColor: 'rgba(27,31,44,0.5)', border: '1px solid rgba(66,71,84,0.08)' }}
