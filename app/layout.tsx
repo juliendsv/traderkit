@@ -6,9 +6,39 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
+const siteUrl = "https://traderkit.xyz";
+const title = "TraderKit — Crypto Trading Journal";
+const description =
+  "The trading journal built for crypto. Auto-import from Kraken, Binance, and Coinbase. Track P&L with FIFO precision and generate EU tax reports.";
+
 export const metadata: Metadata = {
-  title: "TraderKit — Crypto Trading Journal",
-  description: "The trading journal built for crypto. Auto-import from Kraken, Binance, and Coinbase. See your real win rate and P&L.",
+  metadataBase: new URL(siteUrl),
+  title,
+  description,
+  keywords: [
+    "crypto trading journal",
+    "crypto tax reports",
+    "FIFO cost basis",
+    "crypto P&L tracker",
+    "EU crypto tax",
+    "Kraken trading journal",
+  ],
+  alternates: {
+    canonical: siteUrl,
+  },
+  openGraph: {
+    title,
+    description,
+    url: siteUrl,
+    siteName: "TraderKit",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

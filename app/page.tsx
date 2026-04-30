@@ -2,9 +2,28 @@ import { CandlestickChart, Check, Zap, BarChart2, CalendarDays, Lock, TrendingUp
 import { WaitlistForm } from './_components/WaitlistForm'
 import { ExchangeLogo } from '@/components/KrakenLogo'
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "TraderKit",
+  applicationCategory: "FinanceApplication",
+  operatingSystem: "Web",
+  description:
+    "The trading journal built for crypto. Auto-import from Kraken, Binance, and Coinbase. Track P&L with FIFO precision and generate EU tax reports.",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+};
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#0a0e1a] text-white" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
       {/* Nav */}
       <header className="fixed top-0 w-full z-50 bg-[#0A0E1A]/80 backdrop-blur-xl border-b border-[#424754]/10">
