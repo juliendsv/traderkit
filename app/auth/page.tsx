@@ -1,15 +1,15 @@
+import { connection } from 'next/server'
 import AuthCard from './AuthCard'
-
-// searchParams is a request-time API — this page must always render on demand.
-// force-dynamic opts the route out of PPR prerendering entirely, which is
-// correct for an auth page that should never be statically cached.
-export const dynamic = 'force-dynamic'
 
 export default async function AuthPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>
 }) {
+  // connection() is the cacheComponents-compatible replacement for
+  // `export const dynamic = 'force-dynamic'`. Everything below is excluded
+  // from prerendering and rendered on each request — correct for an auth page.
+  await connection()
   const { error } = await searchParams
 
   return (
