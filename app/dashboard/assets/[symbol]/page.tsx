@@ -68,7 +68,13 @@ export default async function AssetDetailPage({
     notFound()
   }
 
-  const allStats = computeAssetStats(filteredTrades)
+  const allStats = computeAssetStats(filteredTrades.map((t) => ({
+    ...t,
+    amount: Number(t.amount),
+    price: Number(t.price),
+    fee: Number(t.fee),
+    pnl: t.pnl !== null ? Number(t.pnl) : null,
+  })))
   const asset = allStats.find((a) => a.symbol === decodedSymbol) ?? allStats[0]
   if (!asset) notFound()
 

@@ -2,9 +2,14 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { computeAssetStats, AssetStats } from '@/lib/pnl/assets'
-import { fetchKrakenBalances, fetchKrakenPrices, krakenBaseSymbol } from '@/lib/ccxt/kraken'
-import { fetchBinanceBalances, binanceBaseSymbol, type BinanceVariant } from '@/lib/ccxt/binance'
-import { fetchCoinbaseBalances } from '@/lib/ccxt/coinbase'
+import { krakenBaseSymbol } from '@/lib/ccxt/kraken'
+import { binanceBaseSymbol, type BinanceVariant } from '@/lib/ccxt/binance'
+import {
+  cachedKrakenBalances,
+  cachedBinanceBalances,
+  cachedCoinbaseBalances,
+  cachedKrakenPrices,
+} from '@/lib/cache/exchanges'
 import { decrypt } from '@/lib/crypto'
 
 const BINANCE_VARIANTS = new Set<string>(['binance', 'binanceus', 'binanceusdm'])
@@ -286,20 +291,20 @@ export default async function AssetsPage({
       allExchanges.map(async (ex) => {
         const apiKey = decrypt(ex.api_key_encrypted)
         const apiSecret = decrypt(ex.api_secret_encrypted)
-        let rawBalances: Map<string, number>
+        let rawBalances: Record<string, number>
 
         if (ex.exchange_name === 'kraken') {
-          rawBalances = await fetchKrakenBalances(apiKey, apiSecret)
+          rawBalances = await cachedKrakenBalances(user.id, apiKey, apiSecret)
         } else if (BINANCE_VARIANTS.has(ex.exchange_name)) {
-          rawBalances = await fetchBinanceBalances(ex.exchange_name as BinanceVariant, apiKey, apiSecret)
+          rawBalances = await cachedBinanceBalances(user.id, ex.exchange_name as BinanceVariant, apiKey, apiSecret)
         } else if (ex.exchange_name === 'coinbase') {
-          rawBalances = await fetchCoinbaseBalances(apiKey, apiSecret)
+          rawBalances = await cachedCoinbaseBalances(user.id, apiKey, apiSecret)
         } else {
           return
         }
 
         const displayName = EXCHANGE_DISPLAY[ex.exchange_name] ?? ex.exchange_name
-        for (const [currency, amount] of rawBalances.entries()) {
+        for (const [currency, amount] of Object.entries(rawBalances)) {
           if (amount <= 1e-8) continue
           const base = normalizeSymbol(currency)
           if (!mergedBalances.has(base)) {
@@ -315,8 +320,18 @@ export default async function AssetsPage({
     anyBalanceError = balanceResults.some((r) => r.status === 'rejected')
   }
 
-  // Build stats from trade history
-  const tradeStats = computeAssetStats(trades ?? [])
+  // Build stats from trade history.
+  // Supabase returns NUMERIC columns as strings at runtime — coerce to numbers
+  // before passing to computeAssetStats so that accumulator arithmetic doesn't
+  // fall back to string concatenation and corrupt the average cost calculation.
+  const normalizedTrades = (trades ?? []).map((t) => ({
+    ...t,
+    amount: Number(t.amount),
+    price: Number(t.price),
+    fee: Number(t.fee),
+    pnl: t.pnl !== null ? Number(t.pnl) : null,
+  }))
+  const tradeStats = computeAssetStats(normalizedTrades)
   const tradeStatsMap = new Map(tradeStats.map((a) => [a.symbol, a]))
 
   // Collect every raw symbol from trade history and live balance
@@ -340,7 +355,7 @@ export default async function AssetsPage({
   let priceFetchedAt: string | null = null
   if (basesWithHolding.length > 0) {
     try {
-      prices = await fetchKrakenPrices(basesWithHolding)
+      prices = new Map(Object.entries(await cachedKrakenPrices(basesWithHolding)))
       if (prices.size > 0) {
         priceFetchedAt = new Date().toLocaleTimeString('en-US', {
           hour: '2-digit',
