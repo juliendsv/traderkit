@@ -1,0 +1,45 @@
+---
+title: "Why FIFO matters for your crypto tax report"
+date: "2026-04-28"
+excerpt: "FIFO is the cost-basis method mandated in Germany and widely used across EU jurisdictions. Here's why it matters, what it means in practice, and how TraderKit automates the calculation so you never have to think about it again."
+author: "TraderKit Team"
+tags: ["tax", "FIFO", "EU crypto tax", "cost basis"]
+---
+
+Every time you sell a cryptocurrency, you need to answer one question: what did you originally pay for it?
+
+That sounds simple. But if you bought Bitcoin in several batches over the years (€1,000 worth in 2021, €2,000 in 2022, €500 in 2023), which purchase counts when you sell? The answer depends on your *cost-basis method*, and in many EU jurisdictions that method is not optional: it is mandated by law.
+
+## What is FIFO?
+
+FIFO stands for **First In, First Out**. Under this method, the first coins you acquired are treated as the first you dispose of. Your oldest purchase defines your cost basis for each sale.
+
+Consider a simple example. You bought 0.1 BTC at €20,000 per coin, then a second 0.1 BTC at €40,000 per coin. You later sell 0.1 BTC when the price is €35,000.
+
+Under **FIFO**, the cost basis is €20,000 → **taxable gain of €15,000**.
+
+Under **LIFO** (Last In, First Out), the cost basis would be €40,000 → **taxable loss of €5,000**.
+
+Same trade, same market price, a €20,000 difference in reported income depending on which method you apply.
+
+## Why the EU defaults to FIFO
+
+Germany's *Bundesministerium der Finanzen* explicitly mandates FIFO for cryptocurrency disposals. Most other EU tax authorities either require FIFO outright or recommend it as the default chronological method, for three reasons:
+
+- **Auditability:** there is a clear, reconstructable paper trail from every acquisition to every disposal.
+- **Consistency:** taxpayers cannot selectively pick which lot to sell in order to minimise their bill.
+- **Conservative accounting:** older lots typically carry a lower cost basis, so gains are reported sooner rather than deferred indefinitely.
+
+France uses a different method, the weighted average cost (CUMP), but the bookkeeping discipline is identical: every acquisition must be logged with its date and price, and matched against each disposal in a defined order.
+
+## Why the manual approach breaks fast
+
+A trader with just two exchanges and moderate activity easily accumulates 300-500 trades per year. Tracking cost basis across that volume in a spreadsheet is error-prone. A single missing trade, a mistyped price, or a forgotten fee will silently corrupt every calculation that follows. You will only discover the error when your accountant asks questions.
+
+## How TraderKit handles it
+
+TraderKit connects to your exchange via read-only API keys and maintains a running FIFO ledger for every asset in your portfolio. Each acquisition is stamped with its date, exchange rate, and fee. When you dispose of an asset, the matching is resolved automatically and the realised gain or loss is calculated to the cent.
+
+When EU tax report features launch, you will be able to export a ready-to-file document for France, Germany, and Portugal: no spreadsheet, no manual matching, no risk of getting it wrong.
+
+Join the waitlist below to get early access when tax reports go live.

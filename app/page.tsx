@@ -35,7 +35,7 @@ export default function LandingPage() {
             </a>
             <div className="hidden md:flex items-center gap-6">
               <a href="#features" className="text-[#8c909f] hover:text-white text-sm font-medium transition-colors">Features</a>
-              <a href="#about" className="text-[#8c909f] hover:text-white text-sm font-medium transition-colors">About</a>
+<a href="/blog" className="text-[#8c909f] hover:text-white text-sm font-medium transition-colors">Blog</a>
             </div>
           </div>
           <a
@@ -57,7 +57,7 @@ export default function LandingPage() {
       >
         <div className="max-w-4xl w-full space-y-8">
           <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight leading-tight">
-            The trading journal<br />built for crypto.
+            The trading platform<br />built for crypto.
           </h1>
           <p className="text-xl text-[#8c909f] max-w-2xl mx-auto font-medium leading-relaxed">
             Auto-import trades from your exchange. Track P&amp;L with FIFO precision. Generate EU tax reports. Know exactly where you stand.
