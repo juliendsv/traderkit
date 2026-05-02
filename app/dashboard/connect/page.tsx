@@ -2,6 +2,10 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ConnectExchangeForm } from '@/components/connect/ConnectExchangeForm'
 import { KrakenLogo } from '@/components/KrakenLogo'
+import { BinanceLogo } from '@/components/BinanceLogo'
+import { BINANCE_VARIANT_LABELS, type BinanceVariant } from '@/lib/ccxt/binance'
+
+const BINANCE_VARIANTS = new Set<string>(['binance', 'binanceus', 'binanceusdm'])
 
 export default async function ConnectPage() {
   const supabase = await createClient()
@@ -13,7 +17,9 @@ export default async function ConnectPage() {
     .select('id, exchange_name, is_active, last_synced_at, created_at')
     .eq('user_id', user.id)
 
-  const krakenConnected = exchanges?.some((e) => e.exchange_name === 'kraken' && e.is_active)
+  const krakenConn = exchanges?.find((e) => e.exchange_name === 'kraken' && e.is_active)
+  const binanceConns = (exchanges ?? []).filter((e) => BINANCE_VARIANTS.has(e.exchange_name) && e.is_active)
+  const hasAnyExchange = krakenConn || binanceConns.length > 0
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -39,32 +45,65 @@ export default async function ConnectPage() {
             boxShadow: 'inset 0 0 12px rgba(59,130,246,0.1)',
           }}
         >
-          {krakenConnected ? (
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <KrakenLogo size={40} />
-                <div>
-                  <p className="text-white font-semibold">Kraken connected</p>
-                  <p className="text-[10px]" style={{ color: '#4edea3' }}>● Active</p>
+          {/* Connected exchanges summary */}
+          {hasAnyExchange && (
+            <div className="mb-8 space-y-3">
+              <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: '#64748b' }}>
+                Connected Accounts
+              </p>
+
+              {krakenConn && (
+                <div
+                  className="flex items-center justify-between rounded-xl px-4 py-3"
+                  style={{ backgroundColor: '#131720', border: '1px solid rgba(66,71,84,0.15)' }}
+                >
+                  <div className="flex items-center gap-3">
+                    <KrakenLogo size={28} />
+                    <div>
+                      <p className="text-white text-sm font-semibold">Kraken</p>
+                      <p className="text-[10px]" style={{ color: '#4edea3' }}>● Active</p>
+                    </div>
+                  </div>
+                  <div className="text-right text-xs" style={{ color: '#8c909f' }}>
+                    {krakenConn.last_synced_at
+                      ? `Synced ${new Date(krakenConn.last_synced_at).toLocaleDateString()}`
+                      : `Added ${new Date(krakenConn.created_at).toLocaleDateString()}`}
+                  </div>
                 </div>
-              </div>
-              {exchanges?.filter((e) => e.exchange_name === 'kraken').map((ex) => (
-                <div key={ex.id} className="text-sm space-y-1" style={{ color: '#8c909f' }}>
-                  <p>Connected: {new Date(ex.created_at).toLocaleDateString()}</p>
-                  {ex.last_synced_at && (
-                    <p>Last synced: {new Date(ex.last_synced_at).toLocaleString()}</p>
-                  )}
+              )}
+
+              {binanceConns.map((ex) => (
+                <div
+                  key={ex.id}
+                  className="flex items-center justify-between rounded-xl px-4 py-3"
+                  style={{ backgroundColor: '#131720', border: '1px solid rgba(66,71,84,0.15)' }}
+                >
+                  <div className="flex items-center gap-3">
+                    <BinanceLogo size={28} />
+                    <div>
+                      <p className="text-white text-sm font-semibold">
+                        {BINANCE_VARIANT_LABELS[ex.exchange_name as BinanceVariant]}
+                      </p>
+                      <p className="text-[10px]" style={{ color: '#4edea3' }}>● Active</p>
+                    </div>
+                  </div>
+                  <div className="text-right text-xs" style={{ color: '#8c909f' }}>
+                    {ex.last_synced_at
+                      ? `Synced ${new Date(ex.last_synced_at).toLocaleDateString()}`
+                      : `Added ${new Date(ex.created_at).toLocaleDateString()}`}
+                  </div>
                 </div>
               ))}
-              <div className="mt-6 pt-4" style={{ borderTop: '1px solid rgba(66,71,84,0.15)' }}>
-                <p className="text-sm" style={{ color: '#64748b' }}>
-                  To reconnect with new API keys, delete this connection and add again.
+
+              <div className="pt-2" style={{ borderTop: '1px solid rgba(66,71,84,0.15)' }}>
+                <p className="text-xs" style={{ color: '#64748b' }}>
+                  To reconnect with new API keys, delete the connection and re-add it.
                 </p>
               </div>
             </div>
-          ) : (
-            <ConnectExchangeForm />
           )}
+
+          <ConnectExchangeForm />
         </section>
 
         {/* Info panel */}
@@ -85,7 +124,7 @@ export default async function ConnectPage() {
                 <div>
                   <p className="text-sm font-semibold text-white mb-1">AES-256-GCM Encryption</p>
                   <p className="text-xs leading-relaxed" style={{ color: '#c2c6d6' }}>
-                    Your keys are encrypted before they even reach our database. We use industry-standard GCM mode for authenticated encryption.
+                    Your keys are encrypted before they reach our database using industry-standard GCM authenticated encryption.
                   </p>
                 </div>
               </div>
@@ -103,7 +142,6 @@ export default async function ConnectPage() {
             </div>
           </div>
 
-          {/* AES badge */}
           <div className="rounded-2xl p-4" style={{ backgroundColor: '#171b28' }}>
             <div className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#64748b' }}>Secure Link</div>
             <div className="flex items-center gap-2 text-xs" style={{ color: '#4edea3' }}>
@@ -114,7 +152,6 @@ export default async function ConnectPage() {
         </aside>
       </div>
 
-      {/* Footer */}
       <footer className="mt-16 pt-8 flex flex-col md:flex-row justify-between items-center gap-4" style={{ borderTop: '1px solid rgba(66,71,84,0.10)' }}>
         <p className="text-xs font-medium" style={{ color: '#64748b' }}>Keys are encrypted with AES-256-GCM before storage.</p>
         <div className="flex items-center gap-6">

@@ -1,12 +1,26 @@
+import { Suspense } from 'react'
 import AuthCard from './AuthCard'
 
-export default async function AuthPage({
+// Separate async server component so that reading searchParams (a request-time
+// API) happens inside a Suspense boundary. This lets the outer page's static
+// content (background, layout shell) prerender at build time while this part
+// streams in per-request — required by cacheComponents mode.
+async function AuthContent({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>
 }) {
   const { error } = await searchParams
+  return <AuthCard error={error} />
+}
 
+// Outer page is intentionally not async — nothing here accesses request-time
+// data, so the full static shell can be prerendered.
+export default function AuthPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
   return (
     <div
       className="min-h-screen flex items-center justify-center relative overflow-hidden"
@@ -19,7 +33,11 @@ export default async function AuthPage({
       />
 
       <main className="relative z-10 w-full max-w-md px-6 py-12 md:px-0 flex flex-col">
-        <AuthCard error={error} />
+        {/* Fallback is the form with no error — identical to what most users
+            see, so the transition when searchParams resolves is imperceptible. */}
+        <Suspense fallback={<AuthCard />}>
+          <AuthContent searchParams={searchParams} />
+        </Suspense>
       </main>
 
       {/* Decorative bottom-right accent */}

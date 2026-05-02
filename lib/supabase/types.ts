@@ -144,6 +144,54 @@ export type Database = {
         }
         Relationships: []
       }
+      transfers: {
+        Row: {
+          id: string
+          user_id: string
+          exchange_id: string
+          external_id: string
+          currency: string
+          amount: number
+          type: 'deposit' | 'withdrawal'
+          status: string
+          tx_hash: string | null
+          address: string | null
+          occurred_at: string
+          raw_data: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          exchange_id: string
+          external_id: string
+          currency: string
+          amount: number
+          type: 'deposit' | 'withdrawal'
+          status: string
+          tx_hash?: string | null
+          address?: string | null
+          occurred_at: string
+          raw_data?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          exchange_id?: string
+          external_id?: string
+          currency?: string
+          amount?: number
+          type?: 'deposit' | 'withdrawal'
+          status?: string
+          tx_hash?: string | null
+          address?: string | null
+          occurred_at?: string
+          raw_data?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

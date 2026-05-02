@@ -1,10 +1,29 @@
-import { CandlestickChart, Check, Zap, BarChart2, CalendarDays, Lock, TrendingUp, RefreshCw } from 'lucide-react'
+import { CandlestickChart, Check, Zap, BarChart2, CalendarDays, Lock, TrendingUp, RefreshCw, FileText, Globe, Calculator } from 'lucide-react'
 import { WaitlistForm } from './_components/WaitlistForm'
 import { ExchangeLogo } from '@/components/KrakenLogo'
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "TraderKit",
+  applicationCategory: "FinanceApplication",
+  operatingSystem: "Web",
+  description:
+    "The trading journal built for crypto. Auto-import from Kraken, Binance, and Coinbase. Track P&L with FIFO precision and generate EU tax reports.",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+};
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#0a0e1a] text-white" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
       {/* Nav */}
       <header className="fixed top-0 w-full z-50 bg-[#0A0E1A]/80 backdrop-blur-xl border-b border-[#424754]/10">
@@ -41,7 +60,7 @@ export default function LandingPage() {
             The trading journal<br />built for crypto.
           </h1>
           <p className="text-xl text-[#8c909f] max-w-2xl mx-auto font-medium leading-relaxed">
-            Auto-import trades from your exchange. Track P&amp;L with FIFO precision. Know exactly where you stand.
+            Auto-import trades from your exchange. Track P&amp;L with FIFO precision. Generate EU tax reports. Know exactly where you stand.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-8 text-[#8c909f] text-sm font-medium">
             {trustBadges.map((badge) => (
@@ -93,6 +112,43 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Tax Reports — Coming Soon */}
+      <section className="py-24 px-6 bg-[#0f131f] border-t border-[#424754]/10">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase bg-[#4edea3]/10 text-[#4edea3] mb-6">
+              Coming Soon
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">
+              Crypto tax reports for EU traders.
+            </h2>
+            <p className="text-[#8c909f] text-lg max-w-2xl mx-auto leading-relaxed">
+              Your trades are already tracked with FIFO precision. We&apos;re turning that into
+              one-click tax reports — starting with France and Portugal.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {taxFeatures.map((f) => (
+              <div
+                key={f.title}
+                className="p-6 rounded-md bg-[#1b1f2c] border border-[#424754]/10"
+              >
+                <div className="w-10 h-10 rounded-md bg-[#4edea3]/10 text-[#4edea3] flex items-center justify-center mb-4">
+                  <f.icon size={20} />
+                </div>
+                <h3 className="text-white font-bold mb-2">{f.title}</h3>
+                <p className="text-[#8c909f] text-sm leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-center text-[#8c909f] text-sm mt-10">
+            Join the waitlist to get early access when tax reports launch.
+          </p>
+        </div>
+      </section>
+
       {/* Waitlist CTA */}
       <section
         id="about"
@@ -139,7 +195,7 @@ export default function LandingPage() {
   )
 }
 
-const trustBadges = ['Read-only API keys', 'FIFO cost basis', 'No spreadsheets']
+const trustBadges = ['Read-only API keys', 'FIFO cost basis', 'EU tax reports', 'No spreadsheets']
 
 const features = [
   {
@@ -171,6 +227,24 @@ const features = [
     icon: RefreshCw,
     title: 'Always up to date',
     desc: 'Vercel Cron syncs new trades every 4 hours automatically. Trigger manual sync anytime.',
+  },
+]
+
+const taxFeatures = [
+  {
+    icon: FileText,
+    title: 'France PFU + Form 2086',
+    desc: 'Auto-generate your déclaration de plus-values sur actifs numériques. FIFO cost basis, ready for impots.gouv.',
+  },
+  {
+    icon: Globe,
+    title: 'Portugal NHR & beyond',
+    desc: 'Tax reports adapted to local rules. Portugal, Germany, and more EU jurisdictions on the roadmap.',
+  },
+  {
+    icon: Calculator,
+    title: 'Stop paying €200/year',
+    desc: 'Koinly, CoinTracking, and Waltio charge €50–300 per year. TraderKit will include tax reports in your plan.',
   },
 ]
 

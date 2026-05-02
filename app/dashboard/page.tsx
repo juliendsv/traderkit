@@ -28,7 +28,13 @@ export default async function DashboardPage() {
     .select('id, exchange_name, is_active, last_synced_at')
     .eq('user_id', user.id)
 
-  const stats = computeStats(trades ?? [])
+  const stats = computeStats((trades ?? []).map((t) => ({
+    ...t,
+    amount: Number(t.amount),
+    price: Number(t.price),
+    fee: Number(t.fee),
+    pnl: t.pnl !== null ? Number(t.pnl) : null,
+  })))
   const hasExchange = (exchanges ?? []).length > 0
   const lastSynced = exchanges?.find((e) => e.last_synced_at)?.last_synced_at
 

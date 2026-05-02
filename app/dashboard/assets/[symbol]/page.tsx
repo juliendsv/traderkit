@@ -3,12 +3,30 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { computeAssetStats } from '@/lib/pnl/assets'
 import { fetchKrakenBalances, fetchKrakenPrices, krakenBaseSymbol } from '@/lib/ccxt/kraken'
+import { fetchBinanceBalances, binanceBaseSymbol, type BinanceVariant } from '@/lib/ccxt/binance'
+import { fetchCoinbaseBalances } from '@/lib/ccxt/coinbase'
 import { decrypt } from '@/lib/crypto'
 import { TradesTable, TradeTableRow } from '@/components/trades/TradesTable'
 import { TradeSimulator } from '@/components/assets/TradeSimulator'
 
+const BINANCE_VARIANTS = new Set<string>(['binance', 'binanceus', 'binanceusdm'])
+
+const EXCHANGE_DISPLAY: Record<string, string> = {
+  kraken: 'Kraken',
+  binance: 'Binance',
+  binanceus: 'Binance US',
+  binanceusdm: 'Binance Futures',
+  coinbase: 'Coinbase',
+}
+
 function fmt(n: number, decimals = 2) {
   return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+
+function normalizeSymbol(symbol: string): string {
+  const krNorm = krakenBaseSymbol(symbol)
+  if (krNorm !== symbol) return krNorm
+  return binanceBaseSymbol(symbol)
 }
 
 function StatCard({ label, children }: { label: string; children: React.ReactNode }) {
@@ -32,81 +50,95 @@ export default async function AssetDetailPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth')
 
-  // Fetch all trades for this asset (and staking variants, e.g. SOL + SOL.S both have base_currency starting with symbol)
-  // We filter: krakenBaseSymbol(base_currency) === decodedSymbol
-  // Supabase can't run JS, so fetch all and filter client-side — but for correctness, use LIKE or fetch all for user
-  // Simplest safe approach: fetch all trades for user for this base_currency
-  const { data: trades } = await supabase
-    .from('trades')
-    .select('id, pair, base_currency, quote_currency, side, amount, price, fee, pnl, opened_at')
-    .eq('user_id', user.id)
-    .eq('base_currency', decodedSymbol)
-    .order('opened_at', { ascending: true })
-
-  // Also fetch staking variants (e.g. SOL.S, ETH2.S) that map to the same base symbol
+  // Fetch all trades for this asset (including staking variants)
   const { data: allTrades } = await supabase
     .from('trades')
     .select('id, pair, base_currency, quote_currency, side, amount, price, fee, pnl, opened_at')
     .eq('user_id', user.id)
     .order('opened_at', { ascending: true })
 
-  // Filter to only trades where krakenBaseSymbol(base_currency) === decodedSymbol
+  // Filter trades where the base symbol (after normalization) matches
   const filteredTrades = (allTrades ?? []).filter(
-    (t) => krakenBaseSymbol(t.base_currency) === decodedSymbol
+    (t) => normalizeSymbol(t.base_currency) === decodedSymbol
   )
 
-  if (filteredTrades.length === 0 && (trades ?? []).length === 0) {
-    // Check if user has any exchange at all before 404ing
+  if (filteredTrades.length === 0) {
     const { data: exchanges } = await supabase.from('exchanges').select('id').eq('user_id', user.id).limit(1)
     if (!exchanges?.length) redirect('/dashboard/assets')
     notFound()
   }
 
-  const mergedTrades = filteredTrades.length > 0 ? filteredTrades : (trades ?? [])
-
-  // Compute asset stats
-  const allStats = computeAssetStats(mergedTrades)
+  const allStats = computeAssetStats(filteredTrades.map((t) => ({
+    ...t,
+    amount: Number(t.amount),
+    price: Number(t.price),
+    fee: Number(t.fee),
+    pnl: t.pnl !== null ? Number(t.pnl) : null,
+  })))
   const asset = allStats.find((a) => a.symbol === decodedSymbol) ?? allStats[0]
-
   if (!asset) notFound()
 
-  // Fetch exchange for live balance + price
-  const { data: exchange } = await supabase
+  // Fetch all exchanges for multi-exchange live balances
+  const { data: allExchanges } = await supabase
     .from('exchanges')
     .select('id, exchange_name, api_key_encrypted, api_secret_encrypted')
     .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
 
-  let liveBalance: number | null = null
+  // Per-exchange balance for this symbol + merged total
+  const perExchangeBalances: { exchangeName: string; displayName: string; balance: number }[] = []
+  let totalLiveBalance = 0
   let currentPrice: number | null = null
 
-  if (exchange?.exchange_name === 'kraken') {
-    try {
-      const apiKey = decrypt(exchange.api_key_encrypted)
-      const apiSecret = decrypt(exchange.api_secret_encrypted)
+  if (allExchanges && allExchanges.length > 0) {
+    const balanceResults = await Promise.allSettled(
+      allExchanges.map(async (ex) => {
+        const apiKey = decrypt(ex.api_key_encrypted)
+        const apiSecret = decrypt(ex.api_secret_encrypted)
+        let rawBalances: Map<string, number>
 
-      const [balances, prices] = await Promise.all([
-        fetchKrakenBalances(apiKey, apiSecret),
-        fetchKrakenPrices([decodedSymbol]),
-      ])
+        if (ex.exchange_name === 'kraken') {
+          rawBalances = await fetchKrakenBalances(apiKey, apiSecret)
+        } else if (BINANCE_VARIANTS.has(ex.exchange_name)) {
+          rawBalances = await fetchBinanceBalances(ex.exchange_name as BinanceVariant, apiKey, apiSecret)
+        } else if (ex.exchange_name === 'coinbase') {
+          rawBalances = await fetchCoinbaseBalances(apiKey, apiSecret)
+        } else {
+          return { exchangeName: ex.exchange_name, balance: 0 }
+        }
 
-      // Sum all staking variants into live balance
-      let total = 0
-      for (const [currency, amount] of balances.entries()) {
-        if (krakenBaseSymbol(currency) === decodedSymbol) total += amount
+        let total = 0
+        for (const [currency, amount] of rawBalances.entries()) {
+          if (normalizeSymbol(currency) === decodedSymbol) total += amount
+        }
+
+        return { exchangeName: ex.exchange_name, balance: total }
+      })
+    )
+
+    for (const result of balanceResults) {
+      if (result.status === 'fulfilled' && result.value && result.value.balance > 1e-8) {
+        perExchangeBalances.push({
+          exchangeName: result.value.exchangeName,
+          displayName: EXCHANGE_DISPLAY[result.value.exchangeName] ?? result.value.exchangeName,
+          balance: result.value.balance,
+        })
+        totalLiveBalance += result.value.balance
       }
-      liveBalance = total > 1e-8 ? total : null
-      currentPrice = prices.get(decodedSymbol) ?? null
+    }
+
+    // Fetch price (Kraken public API — no auth required, works for any asset)
+    try {
+      const priceMap = await fetchKrakenPrices([decodedSymbol])
+      currentPrice = priceMap.get(decodedSymbol) ?? null
     } catch {
-      // Continue without live data
+      // Continue without price
     }
   }
 
+  const liveBalance = totalLiveBalance > 1e-8 ? totalLiveBalance : null
   const holdings = liveBalance ?? asset.holdings
 
-  // Map trades for the TradesTable component (show all, latest first)
-  const tableRows: TradeTableRow[] = [...mergedTrades]
+  const tableRows: TradeTableRow[] = [...filteredTrades]
     .sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime())
     .map((t) => ({
       id: t.id,
@@ -144,7 +176,10 @@ export default async function AssetDetailPage({
           <div>
             <h1 className="text-3xl font-bold text-white tracking-tight">{decodedSymbol}</h1>
             <p className="text-sm mt-0.5" style={{ color: '#8c909f' }}>
-              {mergedTrades.length} trade{mergedTrades.length !== 1 ? 's' : ''} · {asset.quoteCurrency}
+              {filteredTrades.length} trade{filteredTrades.length !== 1 ? 's' : ''} · {asset.quoteCurrency}
+              {perExchangeBalances.length > 0 && (
+                <span> · Held on: {perExchangeBalances.map((e) => e.displayName).join(', ')}</span>
+              )}
             </p>
           </div>
         </div>
@@ -212,11 +247,39 @@ export default async function AssetDetailPage({
         </StatCard>
       </div>
 
+      {/* Per-exchange breakdown — only shown when holding on 2+ exchanges */}
+      {perExchangeBalances.length > 1 && (
+        <div className="mb-8 rounded-xl p-5" style={{ backgroundColor: '#1b1f2c', border: '1px solid rgba(66,71,84,0.12)' }}>
+          <h3 className="text-sm font-semibold text-white mb-4">Holdings by Exchange</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {perExchangeBalances.map((ex) => (
+              <div
+                key={ex.exchangeName}
+                className="rounded-lg px-4 py-3"
+                style={{ backgroundColor: '#131720', border: '1px solid rgba(66,71,84,0.10)' }}
+              >
+                <p className="text-[11px] font-medium uppercase tracking-wider mb-1" style={{ color: '#8c909f' }}>
+                  {ex.displayName}
+                </p>
+                <p className="text-white font-semibold tabular-nums">
+                  {ex.balance.toLocaleString('en-US', { maximumFractionDigits: 6 })}
+                </p>
+                {totalLiveBalance > 0 && (
+                  <p className="text-[11px] mt-0.5" style={{ color: '#64748b' }}>
+                    {fmt((ex.balance / totalLiveBalance) * 100, 1)}%
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Trade Simulator */}
       {holdings > 0 && (
         <div className="mb-8">
           <TradeSimulator
-            trades={mergedTrades}
+            trades={filteredTrades}
             asset={asset}
             currentPrice={currentPrice}
             liveBalance={liveBalance}
