@@ -1,4 +1,4 @@
-import { CandlestickChart, Check, Zap, BarChart2, CalendarDays, Lock, TrendingUp, RefreshCw, FileText, Globe, Calculator } from 'lucide-react'
+import { CandlestickChart, Check, Zap, BarChart2, CalendarDays, Lock, TrendingUp, RefreshCw, FileText, Globe, Calculator, PenLine, BookOpen, Filter } from 'lucide-react'
 import { WaitlistForm } from './_components/WaitlistForm'
 import { ExchangeLogo } from '@/components/KrakenLogo'
 
@@ -9,7 +9,7 @@ const jsonLd = {
   applicationCategory: "FinanceApplication",
   operatingSystem: "Web",
   description:
-    "The trading journal built for crypto. Auto-import from Kraken, Binance, and Coinbase. Track P&L with FIFO precision and generate EU tax reports.",
+    "The trading platform built for crypto. Auto-import from Kraken, Binance, and Coinbase. Real P&L with FIFO precision, a journal that makes you a better trader, and EU tax reports without spreadsheets.",
   offers: {
     "@type": "Offer",
     price: "0",
@@ -59,38 +59,16 @@ export default function LandingPage() {
           <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight leading-tight">
             The trading platform<br />built for crypto.
           </h1>
-          <p className="text-xl text-[#8c909f] max-w-2xl mx-auto font-medium leading-relaxed">
-            Auto-import trades from your exchange. Track P&amp;L with FIFO precision. Generate EU tax reports. Know exactly where you stand.
-          </p>
+          <div className="flex flex-col gap-2 text-xl text-[#8c909f] max-w-2xl mx-auto font-medium">
+            <p>Real P&amp;L from your exchange.</p>
+            <p>A journal that makes you a better trader.</p>
+            <p>EU tax reports without the spreadsheet.</p>
+          </div>
           <div className="flex flex-wrap items-center justify-center gap-8 text-[#8c909f] text-sm font-medium">
             {trustBadges.map((badge) => (
               <div key={badge} className="flex items-center gap-2">
                 <Check className="text-[#4edea3]" size={16} strokeWidth={3} />
                 {badge}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section id="features" className="py-24 px-6 bg-[#0f131f]">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-16 text-center">
-            <h2 className="text-3xl font-extrabold tracking-tight mb-3">Ditch the manual logging</h2>
-            <p className="text-[#8c909f] whitespace-nowrap">We automates your workflow, you focus on making better trades.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f) => (
-              <div
-                key={f.title}
-                className="p-8 rounded-md bg-[#1b1f2c] border border-[#424754]/10 hover:border-[#adc6ff]/30 transition-colors group"
-              >
-                <div className="w-12 h-12 rounded-md bg-[#adc6ff]/10 text-[#adc6ff] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <f.icon size={22} />
-                </div>
-                <h3 className="text-white font-bold text-lg mb-3">{f.title}</h3>
-                <p className="text-[#8c909f] text-sm leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -120,11 +98,11 @@ export default function LandingPage() {
               Coming Soon
             </span>
             <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">
-              Crypto tax reports for EU traders.
+              Tax season, solved.
             </h2>
             <p className="text-[#8c909f] text-lg max-w-2xl mx-auto leading-relaxed">
-              Your trades are already tracked with FIFO precision. We&apos;re turning that into
-              one-click tax reports — starting with France and Portugal.
+              Crypto tax reports for EU traders, auto-generated from your trade history.
+              FIFO cost basis, ready to file. France first, Portugal next, more EU jurisdictions to follow.
             </p>
           </div>
 
@@ -146,6 +124,65 @@ export default function LandingPage() {
           <p className="text-center text-[#8c909f] text-sm mt-10">
             Join the waitlist to get early access when tax reports launch.
           </p>
+        </div>
+      </section>
+
+      {/* Performance / PnL */}
+      <section id="features" className="py-24 px-6 bg-[#171b28] border-t border-[#424754]/10">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-16 text-center">
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">See how you&apos;re actually doing.</h2>
+            <p className="text-[#8c909f] text-lg max-w-2xl mx-auto leading-relaxed">
+              Win rate, average R:R, P&amp;L by token and day, current streak — calculated from every trade, automatically.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((f) => (
+              <div
+                key={f.title}
+                className="p-8 rounded-md bg-[#1b1f2c] border border-[#424754]/10 hover:border-[#adc6ff]/30 transition-colors group"
+              >
+                <div className="w-12 h-12 rounded-md bg-[#adc6ff]/10 text-[#adc6ff] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <f.icon size={22} />
+                </div>
+                <h3 className="text-white font-bold text-lg mb-3">{f.title}</h3>
+                <p className="text-[#8c909f] text-sm leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Journal — Coming Soon */}
+      <section className="py-24 px-6 bg-[#0f131f] border-t border-[#424754]/10">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase bg-[#4edea3]/10 text-[#4edea3] mb-6">
+              Coming Soon
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">
+              Stop repeating the same mistakes.
+            </h2>
+            <p className="text-[#8c909f] text-lg max-w-2xl mx-auto leading-relaxed">
+              Tag every trade. Write notes that explain your thinking. Filter your stats by setup, emotion, or mistake —
+              and find the patterns that actually make you money.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {journalFeatures.map((f) => (
+              <div
+                key={f.title}
+                className="p-6 rounded-md bg-[#1b1f2c] border border-[#424754]/10"
+              >
+                <div className="w-10 h-10 rounded-md bg-[#adc6ff]/10 text-[#adc6ff] flex items-center justify-center mb-4">
+                  <f.icon size={20} />
+                </div>
+                <h3 className="text-white font-bold mb-2">{f.title}</h3>
+                <p className="text-[#8c909f] text-sm leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -195,7 +232,7 @@ export default function LandingPage() {
   )
 }
 
-const trustBadges = ['Read-only API keys', 'FIFO cost basis', 'EU tax reports', 'No spreadsheets']
+const trustBadges = ['Read-only API keys', 'FIFO P&L', 'Trade journal', 'EU tax reports']
 
 const features = [
   {
@@ -245,6 +282,24 @@ const taxFeatures = [
     icon: Calculator,
     title: 'Stop paying €200/year',
     desc: 'Koinly, CoinTracking, and Waltio charge €50–300 per year. TraderKit will include tax reports in your plan.',
+  },
+]
+
+const journalFeatures = [
+  {
+    icon: PenLine,
+    title: 'Notes & tags per trade',
+    desc: 'Tag trades as planned entry, FOMO, scalp, swing, news, revenge — whatever your patterns are. Add a note before you forget what you were thinking.',
+  },
+  {
+    icon: BookOpen,
+    title: 'Daily journal',
+    desc: 'Capture what worked, what didn’t, and how you felt. Each day’s entry shows up next to your P&L on the calendar.',
+  },
+  {
+    icon: Filter,
+    title: 'Filter stats by tag',
+    desc: 'See your win rate on planned entries vs. FOMO trades. Find the setups worth repeating — and the ones bleeding you out.',
   },
 ]
 

@@ -7,21 +7,23 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
 const siteUrl = "https://traderkit.xyz";
-const title = "TraderKit — Crypto Trading Journal";
+const title = "TraderKit — Crypto Trading Platform: P&L, Journal & Tax";
 const description =
-  "The trading journal built for crypto. Auto-import from Kraken, Binance, and Coinbase. Track P&L with FIFO precision and generate EU tax reports.";
+  "The trading platform for crypto. Real P&L, a journal that makes you a better trader, and EU tax reports — auto-imported from Kraken, Binance, and Coinbase.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title,
   description,
   keywords: [
+    "crypto trading platform",
     "crypto trading journal",
+    "crypto P&L tracker",
     "crypto tax reports",
     "FIFO cost basis",
-    "crypto P&L tracker",
     "EU crypto tax",
     "Kraken trading journal",
+    "crypto journal app",
   ],
   alternates: {
     canonical: siteUrl,
